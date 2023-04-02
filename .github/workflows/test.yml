@@ -1,0 +1,22 @@
+name: Python package
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install MicroPython
+      run: |
+        sudo apt install micropython
+    - name: Test
+      run: |
+        (cd testdata; ./createdata.py)
+        python3 tests.py
+        micropython tests.py
