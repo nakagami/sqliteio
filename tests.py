@@ -4,7 +4,6 @@ import unittest
 import binascii
 
 import sqliteio
-from sqliteio import btree
 from sqliteio import record
 
 
@@ -27,8 +26,6 @@ class TestRecord(unittest.TestCase):
 
     def test_dict_to_value_list(self):
         test = sqliteio.open("testdata/test.sqlite")
-        node = test.pager.get_page(5).get_node()
-        cell = node.cells[1]
         table_schema = test.tables.get("test_table")
         self.assertEqual(
             table_schema.dict_to_value_list({
@@ -158,6 +155,7 @@ class TestNode(TestBase):
         self.assertEqual(index_leaf.pgno, 8)
         self.assertEqual(index_leaf_cell_index, 0)
         self.assertEqual(found, False)
+
 
 class TestBasic(TestBase):
 
@@ -888,6 +886,7 @@ class TestCell(TestBase):
 
         test.close()
 
+
 class TestInsert(TestBase):
     def test_next_rowid(self):
         test = sqliteio.open("testdata/test.sqlite")
@@ -1033,7 +1032,6 @@ class TestInsert(TestBase):
         self.assertEqualDB(no_interior, no_interior2)
         no_interior2.close()
         no_interior.close()
-
 
     def test_insert_many_record(self):
         many_record_empty = sqliteio.open("testdata/many_record_empty.sqlite")

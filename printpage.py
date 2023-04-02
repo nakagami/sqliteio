@@ -4,6 +4,7 @@
 import sys
 import sqliteio
 
+
 def print_page(path):
     database = sqliteio.open(path)
     pager = database.pager

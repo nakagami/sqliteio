@@ -256,7 +256,7 @@ class BTreeNode:
         first_payload = r[:i]
         trailing_pages = []
         while r[i:]:
-            j = i + self.pager.page_size -4
+            j = i + self.pager.page_size - 4
             trailing_pages.append(r[i:j])
             i = j
 
