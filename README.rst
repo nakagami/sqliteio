@@ -68,7 +68,7 @@ Filter by index
        print(rowid)    # print rowid
        print(r)        # print record dict
 
-Insert & Commit & Rollback
+Insert
 ++++++++++++++++++++++++++++++
 
 ::
@@ -86,14 +86,24 @@ Insert & Commit & Rollback
    
    database.insert("table_name", [r1, r2])
 
+Delete
+++++++++++++++++++++++++++++++
 
 ::
 
-   database.rollback()
+   database.delete_by_rowid("test_table", 1)
+
+
+Commit & Rollback
+++++++++++++++++++++++++++++++
 
 ::
 
    database.commit()
+
+::
+
+   database.rollback()
 
 
 Reference
