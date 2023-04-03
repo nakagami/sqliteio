@@ -2,16 +2,23 @@
 sqliteio
 =============
 
-SQLite3 read and write library with its own API.
+sqliteio is a library for reading and writing SQLite3 file with its own API.
 
 I have tested it with recent CPython and MicroPython.
 Working with MicroPython is one of the key motivations.
+
+It can be used with CPython.
+But since it is written in pure python, it is too slow.
+And has limited functionality.
+So there is no advantage to using it with CPython.
 
 Examples
 -------------
 
 Open & Close
 ++++++++++++++++++++++++++++++
+
+Everything starts with open() and ends with close()
 
 ::
 
@@ -23,8 +30,18 @@ Open & Close
    
    database.close()
 
+You can also open() with a BytesIO instance or something byte stream generator.
+
+::
+
+   with open("/path/to/db_name.sqlite", "rb") as f:
+       bytesio = io.BytesIO(f.read())
+       database = open(bytesio)
+
 Fetch all records
 ++++++++++++++++++++++++++++++
+
+Retrieve all data in a table.
 
 ::
 
@@ -36,6 +53,10 @@ Fetch all records
 Get by rowid
 ++++++++++++++++++++++++++++++
 
+Retrieve a record using rowid.
+
+Returns None if there is no record for the rowid.
+
 ::
 
    rowid_record = database.get_by_rowid("table_name", 10)
@@ -46,6 +67,10 @@ Get by rowid
 Get by Primary Key
 ++++++++++++++++++++++++++++++
 
+Retrieve a record using Primary Key.
+
+Returns None if there is no record for the primary key.
+
 ::
 
    rowid, r = database.get_by_pk("table_name", 10)
@@ -55,6 +80,8 @@ Get by Primary Key
 
 Filter by index
 ++++++++++++++++++++++++++++++
+
+Retrieve the target record using the index name.
 
 ::
 
@@ -70,6 +97,8 @@ Filter by index
 
 Insert
 ++++++++++++++++++++++++++++++
+
+Insert using dictionary list data.
 
 ::
 
@@ -89,6 +118,9 @@ Insert
 Delete
 ++++++++++++++++++++++++++++++
 
+Deletion by primary key.
+In other words, sqliteio only has the ability to delete one row at a time.
+
 ::
 
    database.delete_by_rowid("test_table", 1)
@@ -96,6 +128,9 @@ Delete
 
 Commit & Rollback
 ++++++++++++++++++++++++++++++
+
+With Insert and Delete, only the data in memory can be changed and reflected in the file with commit().
+To discard changes, use rollback().
 
 ::
 
