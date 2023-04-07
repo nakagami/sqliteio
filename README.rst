@@ -30,13 +30,20 @@ Everything starts with open() and ends with close()
    
    database.close()
 
+open() as read only file.
+
+::
+
+   f = open("/path/to/db_name.sqlite", "rb")
+   database = sqliteio.open(f)
+
 You can also open() with a BytesIO instance or something byte stream generator.
 
 ::
 
    with open("/path/to/db_name.sqlite", "rb") as f:
        bytesio = io.BytesIO(f.read())
-       database = open(bytesio)
+       database = sqliteio.open(bytesio)
 
 Fetch all records
 ++++++++++++++++++++++++++++++
