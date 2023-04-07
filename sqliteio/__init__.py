@@ -226,10 +226,10 @@ class Database:
         index_schemas = self.index_schemas(table_name)
 
         for r in dict_list:
+            # TODO: check constraint
             self._insert1(r, table_schema, index_schemas)
 
-    def delete_by_rowid(self, table_name, rowid):
-        "delete table record by rowid"
+    def _delete_by_rowid(self, table_name, rowid):
         table_schema = self.table_schema(table_name)
         table_ancestors, table_leaf, table_leaf_cell_index, found = self.pager.find_rowid_table_path(table_schema.pgno, rowid)
 
@@ -248,6 +248,23 @@ class Database:
         table_leaf.delete(table_leaf_cell_index)
         if table_ancestors:
             table_ancestors[-1].merge_children()
+
+    def delete_by_rowid(self, table_name, rowid):
+        "delete table record by rowid"
+        # TODO: check constraint
+        self._delete_by_rowid(table_name, rowid)
+
+    def update_by_rowid(self, table_name, rowid, update_dict):
+        """update table record
+        """
+        table_schema = self.table_schema(table_name)
+        index_schemas = self.index_schemas(table_name)
+
+        # TODO: check constraint
+        r = get_by_rowid(self, table_name, rowid):
+        r.update(update_dict)
+        self._delete_by_rowid(table_name, rowid)
+        self._insert1(r, table_schema, index_schemas)
 
     def commit(self):
         "Save cache page data to storage"
