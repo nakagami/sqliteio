@@ -261,7 +261,7 @@ class Database:
         index_schemas = self.index_schemas(table_name)
 
         # TODO: check constraint
-        r = get_by_rowid(self, table_name, rowid):
+        r = get_by_rowid(self, table_name, rowid)
         r.update(update_dict)
         self._delete_by_rowid(table_name, rowid)
         self._insert1(r, table_schema, index_schemas)
