@@ -98,13 +98,16 @@ class Database:
         ):
             yield self.get_by_rowid(index_schema.table_name, r[-1])
 
-    def get_by_rowid(self, table_name, rowid):
-        "Get table record by rowid"
-        table_schema = self.table_schema(table_name)
+    def _get_by_rowid(self, table_schema, rowid):
         try:
             return next(self.pager.rowid_range_records(table_schema.pgno, rowid, rowid, table_schema.row_converter))
         except StopIteration:
             return None
+
+    def get_by_rowid(self, table_name, rowid):
+        "Get table record by rowid"
+        table_schema = self.table_schema(table_name)
+        return self._get_by_rowid(table_schema, rowid)
 
     def get_by_pk(self, table_name, value):
         "Get table record by primary key"
@@ -229,15 +232,14 @@ class Database:
             # TODO: check constraint
             self._insert1(r, table_schema, index_schemas)
 
-    def _delete_by_rowid(self, table_name, rowid):
-        table_schema = self.table_schema(table_name)
+    def _delete_by_rowid(self, table_schema, rowid):
         table_ancestors, table_leaf, table_leaf_cell_index, found = self.pager.find_rowid_table_path(table_schema.pgno, rowid)
 
         if not found:
             raise ValueError("rowid can't found:{}".format(rowid))
         _, row = table_leaf.record(table_leaf_cell_index, table_schema.row_converter)
         # find related index and remove index
-        for index_schema in self.index_schemas(table_name):
+        for index_schema in self.index_schemas(table_schema.table_name):
             key = [row[c.name] for c in index_schema.columns]
             index_ancestors, index_leaf, index_leaf_cell_index, found = self.pager.find_rowid_index_path(
                 index_schema.pgno, key, rowid, index_schema.orders, False
@@ -251,8 +253,9 @@ class Database:
 
     def delete_by_rowid(self, table_name, rowid):
         "delete table record by rowid"
+        table_schema = self.table_schema(table_name)
         # TODO: check constraint
-        self._delete_by_rowid(table_name, rowid)
+        return self._delete_by_rowid(table_schema, rowid)
 
     def update_by_rowid(self, table_name, rowid, update_dict):
         """update table record
@@ -261,7 +264,7 @@ class Database:
         index_schemas = self.index_schemas(table_name)
 
         # TODO: check constraint
-        r = get_by_rowid(self, table_name, rowid)
+        r = self._get_by_rowid(table_schema, rowid)
         r.update(update_dict)
         self._delete_by_rowid(table_name, rowid)
         self._insert1(r, table_schema, index_schemas)
