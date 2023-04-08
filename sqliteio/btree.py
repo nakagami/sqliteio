@@ -86,6 +86,7 @@ class CellPayload:
         return buf[:self.payload_len]
 
     def free_overflow_pages(self):
+        "overflow page to free list"
         overflow_pgno = self.overflow_pgno
         while overflow_pgno:
             page = self.node.pager.get_page(overflow_pgno)
@@ -334,6 +335,8 @@ class BTreeNode:
         return None
 
     def merge_free_block(self):
+        """if free cell blocks are contiguous, merge them.
+        """
         free_block_offset = self.free_block_offset
         while free_block_offset:
             if self._merge_free_block(free_block_offset):
