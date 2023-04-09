@@ -623,11 +623,9 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
     def insert_node_after(self, leaf_node, ancestors, prev_leaf_node):
         """insert TaleLeafNode page leaf_node befre prev_leaf_node
         """
-        if self.right_most == prev_leaf_node.page.pgno:
-            self.right_most = leaf_node.page.pgno
-            self.insert_node_index(prev_leaf_node, len(self.cells))
-        else:
-            raise ValueError("TODO:")
+        assert self.right_most == prev_leaf_node.page.pgno
+        self.right_most = leaf_node.page.pgno
+        self.insert_node_index(prev_leaf_node, len(self.cells))
 
     def find_rowid_table_path(self, rowid, ancestors):
         for cell in self.cells:
