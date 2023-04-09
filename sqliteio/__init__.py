@@ -167,6 +167,7 @@ class Database:
         table_ancestors, table_leaf, table_leaf_cell_index, found = self.pager.find_rowid_table_path(table_schema.pgno, rowid)
 
         if found:
+            self.rollback()
             raise ValueError("rowid:{} is exists".format(rowid))
 
         # Insert record to TableLeafNode
@@ -264,9 +265,10 @@ class Database:
         index_schemas = self.index_schemas(table_name)
 
         # TODO: check constraint
-        r = self._get_by_rowid(table_schema, rowid)
+        rowid_r = self._get_by_rowid(table_schema, rowid)
+        new_rowid, r = rowid_r
         r.update(update_dict)
-        self._delete_by_rowid(table_name, rowid)
+        self._delete_by_rowid(table_schema, rowid)
         self._insert1(r, table_schema, index_schemas)
 
     def commit(self):

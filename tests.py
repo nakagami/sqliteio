@@ -1229,6 +1229,28 @@ class TestDelete(TestBase):
         large_row.close()
 
 
+class TestUpdate(TestBase):
+    def test_rowid_update(self):
+        database = sqliteio.open("testdata/test.sqlite")
+        with self.assertRaises(ValueError):
+            # rowid 1 is already exist
+            database.update_by_rowid(
+                "test_table",
+                2,
+                {'a': 1}
+            )
+
+        database.update_by_rowid(
+            "test_table",
+            2,
+            {'a': 10}
+        )
+        self.assertEqual(
+            database.get_by_rowid("test_table", 10),
+            (10, {'a': 10, 'b': 'B', 'c': 2, 'd': 1.23, 'e': 1.23, 'w': b'b' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'})
+        )
+
+
 class TestOpen(TestBase):
     def test_readobly(self):
         fileobj = open("testdata/test.sqlite", "rb")
