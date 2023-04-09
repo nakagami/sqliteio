@@ -13,7 +13,7 @@ classifiers = [
 
 setup(
     name="sqliteio",
-    version="0.1.0",
+    version="0.2.0",
     url='https://github.com/nakagami/sqliteio/',
     classifiers=classifiers,
     keywords=['SQLite3'],
