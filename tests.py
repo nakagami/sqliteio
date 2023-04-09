@@ -1230,6 +1230,18 @@ class TestDelete(TestBase):
 
 
 class TestUpdate(TestBase):
+    def test_simple_update(self):
+        database = sqliteio.open("testdata/test.sqlite")
+        database.update_by_rowid(
+            "test_table",
+            2,
+            {'w': b'updated'}
+        )
+        self.assertEqual(
+            database.get_by_rowid("test_table", 2),
+            (2, {'a': 2, 'b': 'B', 'c': 2, 'd': 1.23, 'e': 1.23, 'w': b'updated', 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'})
+        )
+
     def test_rowid_update(self):
         database = sqliteio.open("testdata/test.sqlite")
         with self.assertRaises(ValueError):
