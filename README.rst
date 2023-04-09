@@ -125,7 +125,7 @@ Insert using dictionary list data.
 Delete
 ++++++++++++++++++++++++++++++
 
-Deletion by primary key.
+Deletion by rowid.
 In other words, sqliteio only has the ability to delete one row at a time.
 
 ::
@@ -133,10 +133,25 @@ In other words, sqliteio only has the ability to delete one row at a time.
    database.delete_by_rowid("test_table", 1)
 
 
+Update
+++++++++++++++++++++++++++++++
+
+Update by rowid.
+In other words, sqliteio only has the ability to update one row at a time.
+
+::
+
+   update_data = {
+       'column1': 10,
+       'column2': 'new_data',
+   }
+   database.update_by_rowid("test_table", 1, update_data)
+
+
 Commit & Rollback
 ++++++++++++++++++++++++++++++
 
-With Insert and Delete, only the data in memory can be changed and reflected in the file with commit().
+With Insert, Delete and Update, only the data in memory can be changed and reflected in the file with commit().
 To discard changes, use rollback().
 
 ::
