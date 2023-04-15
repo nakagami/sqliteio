@@ -13,7 +13,7 @@ And has limited functionality.
 So there is no advantage to using it with CPython.
 
 I started this project to learn about sqlite3 data structures.
-I hope this is helpful for those learning about sqlite3's btree+ structure.
+I hope this is helpful for those learning about sqlite3's B+ tree structure.
 
 Examples
 -------------
