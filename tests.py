@@ -155,6 +155,7 @@ class TestNode(TestBase):
         self.assertEqual(index_leaf.pgno, 8)
         self.assertEqual(index_leaf_cell_index, 0)
         self.assertEqual(found, False)
+        database.close()
 
 
 class TestBasic(TestBase):
@@ -1262,6 +1263,7 @@ class TestUpdate(TestBase):
             database.get_by_rowid("test_table", 10),
             (10, {'a': 10, 'b': 'B', 'c': 2, 'd': 1.23, 'e': 1.23, 'w': b'b' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'})
         )
+        database.close()
 
 
 class TestOpen(TestBase):
