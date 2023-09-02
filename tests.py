@@ -1241,6 +1241,7 @@ class TestUpdate(TestBase):
             database.get_by_rowid("test_table", 2),
             (2, {'a': 2, 'b': 'B', 'c': 2, 'd': 1.23, 'e': 1.23, 'w': b'updated', 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'})
         )
+        database.close()
 
     def test_rowid_update(self):
         database = sqliteio.open("testdata/test.sqlite")
@@ -1297,6 +1298,7 @@ class TestOpen(TestBase):
             test1 = sqliteio.open("testdata/test1.sqlite")
             self.assertEqualDB(test, test1)
             test1.close()
+            test.close()
 
 
 if __name__ == "__main__":
