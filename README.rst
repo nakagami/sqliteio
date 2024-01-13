@@ -166,8 +166,8 @@ To discard changes, use rollback().
    database.rollback()
 
 
-Reference
--------------
+Reference for development
+--------------------------------
 
 Reference for reading and writing the source code.
 
