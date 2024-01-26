@@ -30,9 +30,18 @@ from .btree import TableLeafNode, TableInteriorNode, IndexInteriorNode, swap_nod
 __all__ = ("Database", "open")
 
 
+class IntegrityError(Exception):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return self.message
+
+
 class Database:
-    def __init__(self, fileobj):
+    def __init__(self, fileobj, raise_integirty_error=True):
         self.fileobj = fileobj
+        self.raise_integirty_error = raise_integirty_error
         self.pager = Pager(self)
         self.tables = {}
         self.indexes = {}
