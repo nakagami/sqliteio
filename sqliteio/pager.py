@@ -1,7 +1,7 @@
 ################################################################################
 # MIT License
 #
-# Copyright (c) 2023 Hajime Nakagami<nakagami@gmail.com>
+# Copyright (c) 2023, 2024 Hajime Nakagami<nakagami@gmail.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -42,12 +42,12 @@ __all__ = ("Page", "Pager")
 
 
 class Page:
-    def __init__(self, pager, pgno, data, page_type, is_dirty):
+    def __init__(self, pager, pgno, data, page_type):
         self.pager = pager
         self.pgno = pgno
         self.data = bytearray(data)
         self.page_type = page_type
-        self.is_dirty = is_dirty
+        self.is_dirty = False
 
         self.page_offset = 0
         if self.pgno == 1:
@@ -78,7 +78,7 @@ class Page:
     def is_dirty(self, v):
         self._is_dirty = v
         if self._is_dirty:
-            self.pager._set_page(self)
+            self.pager.set_page(self)
 
     def write(self, data, offset):
         "Write data"
@@ -150,10 +150,10 @@ class Pager:
             page.data[offset+i] = c
         page.is_dirty = True
 
-    def _set_page(self, page):
+    def set_page(self, page):
         self.pages[page.pgno] = page
 
-    def _remove_page(self, pgno):
+    def remove_page(self, pgno):
         self.pages[pgno] = None
 
     def find_rowid_table_path(self, pgno, rowid):
@@ -230,13 +230,13 @@ class Pager:
             if not (page := self.pages.get(pgno)):
                 # read page block
                 self.database.fileobj.seek((pgno - 1) * self.page_size, 0)
-                page = Page(self, pgno, self.database.fileobj.read(self.page_size), page_type, False)
+                page = Page(self, pgno, self.database.fileobj.read(self.page_size), page_type)
             return page
         return None
 
     def move_page(self, from_pgno, to_pgno):
         page = self.get_page(from_pgno)
-        self._remove_page(from_pgno)
+        self.remove_page(from_pgno)
         page.pgno = to_pgno
         page.is_dirty = True
 
@@ -253,7 +253,7 @@ class Pager:
         else:
             self.max_pgno += 1
             pgno = self.max_pgno
-            page = Page(self, pgno, b'\x00' * self.page_size, BTREE_PAGE_TYPE_FREE_PAGE, True)
+            page = Page(self, pgno, b'\x00' * self.page_size, BTREE_PAGE_TYPE_FREE_PAGE)
         page.initialize_page(page_type)
         return page
 
@@ -277,6 +277,7 @@ class Pager:
             if page.is_dirty:
                 self.database.fileobj.seek((pgno-1) * self.page_size, 0)
                 self.database.fileobj.write(page.data)
+                page.is_dirty = False
         self.database.fileobj.flush()
         self.pages.clear()
 
