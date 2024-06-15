@@ -30,18 +30,12 @@ import sqliteio
 
 def print_schema(path):
     database = sqliteio.open(path)
-
-    print("table:")
     for t in database.tables.values():
+        print(f"\n{' ' + t.name + ' ':-^80}")
         t._dump()
-
-    print("index:")
-    for i in database.indexes.values():
-        print(i)
-
-    print("view:")
-    for v in database.indexes.values():
-        v._dump()
+        if t.name in database.indexes:
+            for idx in database.indexes[t.name]:
+                idx._dump()
 
     database.close()
 

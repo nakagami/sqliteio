@@ -267,6 +267,9 @@ class TableSchema(BaseSchema):
             for i, c in enumerate(self.columns):
                 c.pos = i
 
+    def _dump(self):
+        print(self.sql)
+
     def _split_definitions(self):
         start = self.sql.find('(') + 1
         end = self.sql.rfind(')')
@@ -373,7 +376,13 @@ class IndexSchema(BaseSchema):
             self.columns = table_schema.primary_keys
             self.orders = [1] * len(self.columns)
 
+    def _dump(self):
+        print(self.sql)
+
 
 class ViewSchema(BaseSchema):
     def __init__(self, name, table_name, pgno, sql):
         super().__init__(name, table_name, pgno, sql)
+
+    def _dump(self):
+        print(self.sql)
