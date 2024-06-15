@@ -51,6 +51,8 @@ def print_page(path):
             node._dump()
         page._dump()
 
+    database.close()
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
