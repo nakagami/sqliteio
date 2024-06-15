@@ -31,6 +31,6 @@ def print_page(path):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("ppage [path_to_database_file]")
+        print("printpage.py [path_to_database_file]")
         sys.exit(0)
     print_page(sys.argv[1])
