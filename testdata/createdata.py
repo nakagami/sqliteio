@@ -17,7 +17,7 @@ def _create_test_table(f):
             c int,
             d real,
             e decimal(10, 2),
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             w blob,
             x date,
             y time,
@@ -59,7 +59,7 @@ def _create_no_interior_table(f):
             c int,
             d real,
             e decimal(10, 2),
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             w blob,
             x date,
             y time,
@@ -101,7 +101,7 @@ def _create_large_row_table(f):
             c int,
             d real,
             e decimal(10, 2),
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             w blob,
             x date,
             y time,
@@ -647,7 +647,7 @@ def create_without_rowid_table():
             c int,
             d real,
             e decimal(10, 2),
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             w blob,
             x date,
             y time,
@@ -682,7 +682,7 @@ def create_str_pk_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE str_pk_table(
-            s varchar(255) primary key,
+            s varchar(255) PRIMARY KEY,
             t varchar(255)
         )""")
     cur.execute("CREATE INDEX str_pk_idx_t ON str_pk_table(t)")
@@ -707,7 +707,7 @@ def create_multi_pk_table():
         CREATE TABLE multi_pk_table(
             a integer,
             b varchar(255),
-            primary key(a, b)
+            PRIMARY KEY(a, b)
         )""")
     cur.execute("CREATE INDEX multi_pk_idx_b ON multi_pk_table(b)")
     cur.execute("INSERT INTO multi_pk_table (a, b) values (1, 'A')")
@@ -729,7 +729,7 @@ def create_many_record_empty_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b integer,
             c varchar(255)
         )""")
@@ -751,7 +751,7 @@ def create_many_record15_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b integer,
             c varchar(255)
         )""")
@@ -774,7 +774,7 @@ def create_many_record333_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b integer,
             c varchar(255)
         )""")
@@ -796,7 +796,7 @@ def create_many_record334_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b integer,
             c varchar(255)
         )""")
@@ -820,7 +820,7 @@ def create_many_record16_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b integer,
             c varchar(255)
         )""")
@@ -842,7 +842,7 @@ def create_many_record_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b integer,
             c varchar(255)
         )""")
@@ -870,7 +870,7 @@ def create_without_rowid_many_record_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE without_rowid_many_record_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b varchar(255)
         ) WITHOUT ROWID""")
     cur.execute("CREATE INDEX without_rowid_many_record_idx_a_b ON without_rowid_many_record_table(a, b)")
@@ -892,7 +892,7 @@ def create_str_pk_many_record_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE str_pk_many_record_table(
-            s varchar(255) primary key,
+            s varchar(255) PRIMARY KEY,
             t varchar(255)
         )""")
     cur.execute("CREATE INDEX str_pk_idx_t ON str_pk_many_record_table(t)")
@@ -916,7 +916,7 @@ def create_multi_pk_many_record_table():
         CREATE TABLE multi_pk_many_record_table(
             a integer,
             b varchar(255),
-            primary key(a, b)
+            PRIMARY KEY(a, b)
         )""")
 
     for i in range(1, 1000):
@@ -937,7 +937,7 @@ def create_pk_fk_table():
     cur.execute("pragma page_size=512")
     cur.execute("""
         CREATE TABLE base_table(
-            a integer primary key not null,
+            a integer PRIMARY KEY not null,
             b varchar(255),
             c int,
             d real,
@@ -949,10 +949,10 @@ def create_pk_fk_table():
         )""")
     cur.execute("""
         CREATE TABLE fk_table(
-            id integer primary key,
+            id integer PRIMARY KEY,
             fk int,
             s varchar(255),
-            foreign key (fk) references base_table(a)
+            FOREIGN KEY (fk) REFERENCES base_table(a)
         )""")
     cur.execute("PRAGMA foreign_keys=True")
     cur.execute("""
