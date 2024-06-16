@@ -74,8 +74,14 @@ class Database:
 
     def get_index_schema_by_name(self, name):
         "Get IndexSchama by index name"
-        for i in self._get_indexes():
-            if i.name == name:
+        for idx in self._get_indexes():
+            if idx.name == name:
+                return idx
+        return None
+
+    def get_index_scham_by_column_names(self, table_name, column_names):
+        for idx in self.index_schema(table_name).values():
+            if tuple(idx.colujmns) == tuple(column_names):
                 return i
         return None
 
