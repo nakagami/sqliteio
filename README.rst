@@ -88,19 +88,18 @@ Returns None if there is no record for the primary key.
    print(r)
 
 
-Filter by index
+Filter
 ++++++++++++++++++++++++++++++
 
-Retrieve the target record using the index name.
+Retrieve the target records using a table name and conditions.
 
 ::
 
-   index_schema = database.get_index_schema_by_name("index_name")
-   index_key = {
+   cond = {
        "column1': 1,
        "column2": "str",
    }
-   for rowid_record in database.filter_by_index(index_schema, index_key):
+   for rowid_record in database.filter("test_table", cond):
        (rowid, r) = rowid_record
        print(rowid)    # print rowid
        print(r)        # print record dict
