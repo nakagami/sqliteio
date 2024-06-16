@@ -226,7 +226,7 @@ class TableSchema(BaseSchema):
         self.database = database
         self.columns = []
         self.primary_keys = []
-        self.foreign_key_constraintss = []
+        self.foreign_key_constraints = []
         self.check_constraints = []
         self.unique_key_constraints = []
 
