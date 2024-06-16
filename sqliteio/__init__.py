@@ -166,11 +166,21 @@ class Database:
         return None
 
     def filter(self, table_name, cond):
-        if idx := self.get_index_schema_by_column_names(table_name, list(cond.keys())):
-            print('000')
-            return self._filter_by_index(idx, cond)
+        if index_schema := self.get_index_schema_by_column_names(table_name, list(cond.keys())):
+            # use index
+            key_column_names = [c.name for c in index_schema.columns]
+            if set(key_column_names) != set(cond.keys()):
+                raise ValueError("index columns={}".format(",".join(key_column_names)))
+            key_values = [cond[k] for k in key_column_names]
+            for _, r in self.pager.index_range_records(
+                index_schema.pgno,
+                key_values, key_values,
+                index_schema.orders,
+                list(range(len(index_schema.columns)))
+            ):
+                yield self.get_by_rowid(index_schema.table_name, r[-1])
         else:
-            for r in fetch_all(self, table_name):
+            for r in self.fetch_all(table_name):
                 if all([r[1][k] == v for k, v in cond.items()]):
                     yield r
 
