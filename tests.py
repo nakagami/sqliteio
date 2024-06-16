@@ -206,17 +206,19 @@ class TestBasic(TestBase):
         )
         self.assertEqual(database.get_by_pk("test_table", 5), None)
 
+        expect = [(1, {'a': 1, 'b': 'A', 'c': 1, 'd': 1.23, 'e': 1.23, 'w': b'a' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'}),]
         # _filter_by_index
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
-        expect = [(1, {'a': 1, 'b': 'A', 'c': 1, 'd': 1.23, 'e': 1.23, 'w': b'a' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'}),]
         self.assertEqual(list(database._filter_by_index(index_schema, {"b": "A", "c": 1})), expect)
         self.assertEqual(list(database.filter("test_table", {"b": "A", "c": 1})), expect)
 
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
         with self.assertRaises(ValueError):
             list(database._filter_by_index(index_schema, {"b": "A"}))
+        # filter without index
+        self.assertEqual(list(database.filter("test_table", {"a": 1, "b": "A"})), expect)
 
-        # find_rowid_table_path()
+        # find_rowid_table_path
         ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, True))
         ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)

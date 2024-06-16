@@ -165,12 +165,14 @@ class Database:
 
         return None
 
-    def filter(self, table_name, condition):
-        if idx := self.get_index_schema_by_column_names(table_name, list(condition.keys())):
-            return self._filter_by_index(idx, condition)
+    def filter(self, table_name, cond):
+        if idx := self.get_index_schema_by_column_names(table_name, list(cond.keys())):
+            print('000')
+            return self._filter_by_index(idx, cond)
         else:
-            # TODO
-            pass
+            for r in fetch_all(self, table_name):
+                if all([r[1][k] == v for k, v in cond.items()]):
+                    yield r
 
     def _get_next_rowid(self, table_schema):
         node = self.pager.get_page(table_schema.pgno).get_node()
