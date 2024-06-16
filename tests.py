@@ -206,17 +206,17 @@ class TestBasic(TestBase):
         )
         self.assertEqual(database.get_by_pk("test_table", 5), None)
 
-        # filter_by_index
+        # _filter_by_index
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
         self.assertEqual(
-            list(database.filter_by_index(index_schema, {"b": "A", "c": 1})), [
+            list(database._filter_by_index(index_schema, {"b": "A", "c": 1})), [
                 (1, {'a': 1, 'b': 'A', 'c': 1, 'd': 1.23, 'e': 1.23, 'w': b'a' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'}),
             ]
         )
 
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
         with self.assertRaises(ValueError):
-            list(database.filter_by_index(index_schema, {"b": "A"}))
+            list(database._filter_by_index(index_schema, {"b": "A"}))
 
         # find_rowid_table_path()
         ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)

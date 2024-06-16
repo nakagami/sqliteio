@@ -98,7 +98,7 @@ class Database:
         table_schema = self.table_schema(table_name)
         return self.pager.records(table_schema.pgno, table_schema.row_converter)
 
-    def filter_by_index(self, index_schema, key_dict):
+    def _filter_by_index(self, index_schema, key_dict):
         "Filter by index column and Fetch records"
         key_column_names = [c.name for c in index_schema.columns]
         if set(key_column_names) != set(key_dict.keys()):
