@@ -80,9 +80,9 @@ class Database:
         return None
 
     def get_index_schema_by_column_names(self, table_name, column_names):
-        for idx in self.index_schema(table_name).values():
+        for idx in self.indexes[table_name]:
             if tuple([c.name for c in idx.columns]) == tuple(column_names):
-                return i
+                return idx
         return None
 
     def table_schema(self, table_name):
@@ -164,6 +164,13 @@ class Database:
             return self.get_by_rowid(table_name, r[-1])
 
         return None
+
+    def filter(self, table_name, condition):
+        if idx := self.get_index_schema_by_column_names(table_name, list(condition.keys())):
+            return self._filter_by_index(idx, condition)
+        else:
+            # TODO
+            pass
 
     def _get_next_rowid(self, table_schema):
         node = self.pager.get_page(table_schema.pgno).get_node()
