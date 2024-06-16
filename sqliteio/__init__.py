@@ -81,7 +81,7 @@ class Database:
 
     def get_index_schema_by_column_names(self, table_name, column_names):
         for idx in self.index_schema(table_name).values():
-            if tuple(idx.colujmns) == tuple(column_names):
+            if tuple([c.name for c in idx.columns]) == tuple(column_names):
                 return i
         return None
 
