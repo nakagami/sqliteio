@@ -224,11 +224,11 @@ class TableSchema(BaseSchema):
     def __init__(self, name, table_name, pgno, sql, database):
         super().__init__(name, table_name, pgno, sql)
         self.database = database
-        self.columns = []
-        self.primary_keys = []
-        self.foreign_key_constraints = []
-        self.check_constraints = []
-        self.unique_key_constraints = []
+        self.columns = []                   # list[TableColumn]
+        self.primary_keys = []              # list[str]
+        self.foreign_key_constraints = []   # list[(list[str], str, list[str])]
+        self.check_constraints = []         # list[str]
+        self.unique_key_constraints = []    # list[list[str]]
 
         definitions = self._split_definitions()
         for d in definitions:
