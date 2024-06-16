@@ -208,11 +208,9 @@ class TestBasic(TestBase):
 
         # _filter_by_index
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
-        self.assertEqual(
-            list(database._filter_by_index(index_schema, {"b": "A", "c": 1})), [
-                (1, {'a': 1, 'b': 'A', 'c': 1, 'd': 1.23, 'e': 1.23, 'w': b'a' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'}),
-            ]
-        )
+        expect = [(1, {'a': 1, 'b': 'A', 'c': 1, 'd': 1.23, 'e': 1.23, 'w': b'a' * 150, 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'}),]
+        self.assertEqual(list(database._filter_by_index(index_schema, {"b": "A", "c": 1})), expect)
+        self.assertEqual(list(database.filter("test_tabl", {"b": "A", "c": 1})), expect)
 
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
         with self.assertRaises(ValueError):

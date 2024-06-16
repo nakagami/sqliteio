@@ -379,7 +379,7 @@ class IndexSchema(BaseSchema):
                 raise NotImplementedError("Can't parse:{}".format(self.tokens))
         else:
             self.is_primary_key = True
-            self.columns = table_schema.primary_keys
+            self.columns = [table_schema.get_column_by_name(name) for name in table_schema.primary_keys]
             self.orders = [1] * len(self.columns)
 
     def _dump(self):
