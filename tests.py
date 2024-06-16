@@ -169,10 +169,7 @@ class TestBasic(TestBase):
             [c.name for c in table_schema.columns],
             ["b", "c", "d", "e", "a", "w", "x", "y", "z"]
         )
-        self.assertEqual(
-            [c.name for c in table_schema.primary_keys],
-            ["a"]
-        )
+        self.assertEqual(table_schema.primary_keys, ["a"])
         # fetch_all
         self.assertEqual(
             list(database.fetch_all("test_table")), [
@@ -614,10 +611,7 @@ class TestBasic(TestBase):
             [c.name for c in table_schema.columns],
             ["a", "b", "c", "d", "e", "w", "x", "y", "z"]
         )
-        self.assertEqual(
-            [c.name for c in table_schema.primary_keys],
-            ["a"]
-        )
+        self.assertEqual(table_schema.primary_keys, ["a"])
         self.assertEqual(
             list(database.fetch_all("without_rowid_table")), [
                 (None, {'a': 10, 'b': 'A', 'c': 1, 'd': 1.23, 'e': 1.23, 'w': b'bin', 'x': '1967-08-11', 'y': '12:34:45', 'z': '1967-08-11 12:34:45'}),
@@ -684,10 +678,7 @@ class TestBasic(TestBase):
             [c.name for c in table_schema.columns],
             ["a", "b"]
         )
-        self.assertEqual(
-            [c.name for c in table_schema.primary_keys],
-            ["a", "b"]
-        )
+        self.assertEqual(table_schema.primary_keys, ["a", "b"])
         self.assertEqual(
             list(database.fetch_all("multi_pk_table")), [
                 (1, {'a': 1, 'b': "A"}),

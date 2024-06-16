@@ -225,7 +225,10 @@ class TableSchema(BaseSchema):
         super().__init__(name, table_name, pgno, sql)
         self.database = database
         self.columns = []
-        primary_keys = []
+        self.primary_keys = []
+        self.foreign_key_constraintss = []
+        self.check_constraints = []
+        self.unique_key_constraints = []
 
         definitions = self._split_definitions()
         for d in definitions:
@@ -239,17 +242,16 @@ class TableSchema(BaseSchema):
                 pos = len(self.columns)
                 self.columns.append(TableColumn(pos, value, tokens, next_i))
             if tok == TOK_PRIMARY_KEY:
-                primary_keys = value
+                self.primary_keys = value
 
         create_table_option = self.sql[self.sql.rfind(')'):].upper()
         self.without_rowid = bool(re.search(r'WITHOUT\s+ROWID', create_table_option))
 
         # find primary key
-        if not primary_keys:
+        if not self.primary_keys:
             for c in self.columns:
                 if c.is_primary_key:
-                    primary_keys.append(c.name)
-        self.primary_keys = [self.get_column_by_name(s) for s in primary_keys]
+                    self.primary_keys.append(c.name)
 
         # find rowid
         if not self.without_rowid:
@@ -336,6 +338,10 @@ class TableSchema(BaseSchema):
     @property
     def column_names(self):
         return [c.name for c in self.columns]
+
+    @property
+    def primary_key_columns(self):
+        return [self.get_column_by_name(s) for s in self.primary_keys]
 
     def get_column_by_name(self, name):
         for column in self.columns:
