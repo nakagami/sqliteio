@@ -54,6 +54,8 @@ def swap_node(node1, node2):
 
 
 class CellPayload:
+    __slots__ = ("cell_size", "node", "cell_pointer", "payload_len", "first_payload", "overflow_pgno")
+
     def __init__(self, node, cell_pointer, payload_len, cell_content):
         assert payload_len >= 0
         in_page_bytes = node.calculate_cell_in_page_bytes(payload_len)
@@ -96,6 +98,8 @@ class CellPayload:
 
 
 class Cell:
+    __slots__ = ()
+
     @property
     def cell_block(self):
         "buffer data pointed by cell pointer"
@@ -103,6 +107,8 @@ class Cell:
 
 
 class TableLeafCell(Cell):
+    __slots__ = ("node", "cell_pointer", "rowid", "cell_payload", "size")
+
     def __init__(self, node, cell_pointer):
         self.node = node
         self.cell_pointer = cell_pointer
@@ -117,6 +123,8 @@ class TableLeafCell(Cell):
 
 
 class TableInteriorCell(Cell):
+    __slots__ = ("node", "cell_pointer", "key", "size")
+
     def __init__(self, node, cell_pointer):
         self.node = node
         self.cell_pointer = cell_pointer
@@ -130,11 +138,12 @@ class TableInteriorCell(Cell):
 
     @left_page.setter
     def left_page(self, new_pgno):
-        self.left_pgno = new_pgno
-        self.node._write_page(self.left_pgno.to_bytes(4, "big"), self.cell_pointer)
+        self.node._write_page(new_pgno.to_bytes(4, "big"), self.cell_pointer)
 
 
 class IndexLeafCell(Cell):
+    __slots__ = ("node", "cell_pointer", "cell_payload", "size")
+
     def __init__(self, node, cell_pointer):
         self.node = node
         self.cell_pointer = cell_pointer
@@ -144,6 +153,8 @@ class IndexLeafCell(Cell):
 
 
 class IndexInteriorCell(Cell):
+    __slots__ = ("node", "cell_pointer", "left_page", "cell_payload", "size")
+
     def __init__(self, node, cell_pointer):
         self.node = node
         self.cell_pointer = cell_pointer
@@ -154,6 +165,8 @@ class IndexInteriorCell(Cell):
 
 
 class BTreeNode:
+    __slots__ = ("btree", "pgno", "page_offset")
+
     page_type = None
 
     def __init__(self, btree, page):
@@ -434,7 +447,7 @@ class BTreeNode:
             else:
                 self._write_page(self.free_block_offset.to_bytes(2, "big"), cell.cell_pointer)
                 self.free_block_offset = cell.cell_pointer
-            self.first_byte_of_cell_content = min([c.cell_pointer for c in self.cells])
+            self.first_byte_of_cell_content = min(c.cell_pointer for c in self.cells)
 
         # save remaining pointers
         self.write_cell_pointers([c.cell_pointer for c in self.cells])
@@ -459,6 +472,8 @@ class InteriorNodeMixIn:
 
 
 class TableLeafNode(BTreeNode, LeafNodeMixIn):
+    __slots__ = ("cells",)
+
     page_type = BTREE_PAGE_TYPE_LEAF_TABLE
 
     def _update_cells(self):
@@ -567,6 +582,8 @@ class TableLeafNode(BTreeNode, LeafNodeMixIn):
 
 
 class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
+    __slots__ = ("cells",)
+
     page_type = BTREE_PAGE_TYPE_INTERIOR_TABLE
 
     def _update_cells(self):
@@ -671,7 +688,7 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
             children.append(self.btree.get_node(self.right_most))
         amount_of_page_size = self.page_offset + 8
         for child in children:
-            amount_of_page_size += (child.number_of_cells * 2) + sum([c.size for c in child.cells])
+            amount_of_page_size += (child.number_of_cells * 2) + sum(c.size for c in child.cells)
         if amount_of_page_size > self.pager.page_size:
             return
 
@@ -689,6 +706,8 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
 
 
 class IndexLeafNode(BTreeNode, LeafNodeMixIn):
+    __slots__ = ("cells",)
+
     page_type = BTREE_PAGE_TYPE_LEAF_INDEX
 
     def _update_cells(self):
@@ -790,6 +809,8 @@ class IndexLeafNode(BTreeNode, LeafNodeMixIn):
 
 
 class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
+    __slots__ = ("cells",)
+
     page_type = BTREE_PAGE_TYPE_INTERIOR_INDEX
 
     def _update_cells(self):
@@ -895,6 +916,8 @@ class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
 
 
 class RawPage(BTreeNode):
+    __slots__ = ()
+
     page_type = BTREE_PAGE_TYPE_RAW_PAGE
 
     def __init__(self, btree, page):
@@ -906,6 +929,8 @@ class RawPage(BTreeNode):
 
 class BTree:
     "BTree layer over Pager: tree traversal and node management"
+    __slots__ = ("pager",)
+
     def __init__(self, pager):
         self.pager = pager
 

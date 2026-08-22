@@ -479,9 +479,8 @@ class TableSchema(BaseSchema):
 
         if self.without_rowid:
             # primary key to left
-            primary_keys = set(self.primary_keys)
             for c in self.columns:
-                if c.name in primary_keys:
+                if c.name in self.primary_keys:
                     c.pos = -1
             self.columns = sorted(self.columns, key=lambda c: c.pos)
             for i, c in enumerate(self.columns):

@@ -88,8 +88,9 @@ class Database:
         return None
 
     def get_index_schema_by_column_names(self, table_name, column_names):
+        column_names = tuple(column_names)
         for idx in self.index_schemas(table_name) or []:
-            if tuple([c.name for c in idx.columns]) == tuple(column_names):
+            if tuple(c.name for c in idx.columns) == column_names:
                 return idx
         return None
 
@@ -109,7 +110,7 @@ class Database:
     def _filter_by_index(self, index_schema, key_dict):
         "Filter by index column and Fetch records"
         key_column_names = [c.name for c in index_schema.columns]
-        if set(key_column_names) != set(key_dict.keys()):
+        if len(key_column_names) != len(key_dict) or any(k not in key_dict for k in key_column_names):
             raise ValueError("index columns={}".format(",".join(key_column_names)))
         key_values = [key_dict[k] for k in key_column_names]
 
@@ -117,7 +118,7 @@ class Database:
             index_schema.pgno,
             key_values, key_values,
             index_schema.orders,
-            list(range(len(index_schema.columns)))
+            range(len(index_schema.columns))
         ):
             yield self.get_by_rowid(index_schema.table_name, r[-1])
 
@@ -136,7 +137,7 @@ class Database:
         "Get table record by primary key"
         table_schema = self.table_schema(table_name)
         index_schema = self._get_primary_key_index(table_name)
-        if any([c.is_rowid for c in table_schema.columns]):
+        if any(c.is_rowid for c in table_schema.columns):
             try:
                 return next(self.btree.rowid_range_records(table_schema.pgno, value, value, table_schema.row_converter))
             except StopIteration:
@@ -148,7 +149,7 @@ class Database:
                 table_schema.pgno,
                 value, value,
                 [1] * len(table_schema.primary_keys),
-                list(range(len(table_schema.primary_keys))),
+                range(len(table_schema.primary_keys)),
                 table_schema.row_converter
             )
             try:
@@ -163,7 +164,7 @@ class Database:
                 index_schema.pgno,
                 value, value,
                 index_schema.orders,
-                list(range(len(index_schema.columns))),
+                range(len(index_schema.columns)),
             )
             try:
                 _, r = next(g)
@@ -179,7 +180,7 @@ class Database:
                 yield r
         else:
             for r in self.fetch_all(table_name):
-                if all([r[1][k] == v for k, v in cond.items()]):
+                if all(r[1][k] == v for k, v in cond.items()):
                     yield r
 
     def _get_next_rowid(self, table_schema):

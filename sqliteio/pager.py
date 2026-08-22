@@ -28,6 +28,8 @@ __all__ = ("Page", "Pager", "FreePage")
 
 
 class Page:
+    __slots__ = ("pager", "pgno", "data", "_is_dirty", "page_offset")
+
     def __init__(self, pager, pgno, data):
         self.pager = pager
         self.pgno = pgno
@@ -75,6 +77,8 @@ class Page:
 
 class FreePage:
     "freelist trunk page"
+    __slots__ = ("page",)
+
     def __init__(self, page):
         self.page = page
 
@@ -141,6 +145,8 @@ class FreePage:
 
 
 class Pager:
+    __slots__ = ("database", "pages", "page_size", "max_pgno")
+
     def __init__(self, database):
         self.database = database
         self.pages = {}
