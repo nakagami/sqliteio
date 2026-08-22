@@ -21,9 +21,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 ################################################################################
-import re
-
-
 # https://www.sqlite.org/lang_createtable.html
 # https://www.sqlite.org/datatype3.html
 
@@ -188,10 +185,28 @@ def _is_column_constraint_start(tokens, start):
 
 
 class TableColumn:
+    __slots__ = (
+        "pos",
+        "name",
+        "_tokens",
+        "column_type",
+        "declared_type",
+        "max_length",
+        "precision",
+        "scale",
+        "is_primary_key",
+        "primary_key_order",
+        "is_autoincrement",
+        "is_unique",
+        "has_check",
+        "nullable",
+        "is_rowid",
+    )
+
     def __init__(self, pos, name, tokens, start):
         self.pos = pos
         self.name = name
-        self.tokens = tokens
+        self._tokens = tokens
         self.column_type = TYPE_TEXT
         self.declared_type = ""
         self.max_length = -1
@@ -207,22 +222,23 @@ class TableColumn:
         while start < len(tokens):
             start = self._parse_column_definition(start)
         self.is_rowid = False
+        self._tokens = None
 
     def _parse_type(self, start):
         # https://www.sqlite.org/datatype3.html
         # 3.1. Determination Of Column Affinity
-        if start >= len(self.tokens):
+        if start >= len(self._tokens):
             return start
-        if _is_column_constraint_start(self.tokens, start):
+        if _is_column_constraint_start(self._tokens, start):
             return start
 
         i = start
         par_level = 0
         type_tokens = []
-        while i < len(self.tokens):
-            if par_level == 0 and _is_column_constraint_start(self.tokens, i):
+        while i < len(self._tokens):
+            if par_level == 0 and _is_column_constraint_start(self._tokens, i):
                 break
-            token = self.tokens[i]
+            token = self._tokens[i]
             if token == '(':
                 par_level += 1
             elif token == ')' and par_level > 0:
@@ -325,60 +341,62 @@ class TableColumn:
 
     def _parse_column_definition(self, start):
         # https://www.sqlite.org/syntax/column-constraint.html
-        if _is_match_tokens(self.tokens, start, ["CONSTRAINT", None]):
+        if _is_match_tokens(self._tokens, start, ["CONSTRAINT", None]):
             return start + 2
-        if _is_match_tokens(self.tokens, start, ["PRIMARY", "KEY"]):
+        if _is_match_tokens(self._tokens, start, ["PRIMARY", "KEY"]):
             self.is_primary_key = True
             i = start + 2
-            if i < len(self.tokens) and self.tokens[i] in ("ASC", "DESC"):
-                self.primary_key_order = -1 if self.tokens[i] == "DESC" else 1
+            if i < len(self._tokens) and self._tokens[i] in ("ASC", "DESC"):
+                self.primary_key_order = -1 if self._tokens[i] == "DESC" else 1
                 i += 1
             return i
-        if _is_match_tokens(self.tokens, start, ["NOT", "NULL"]):
+        if _is_match_tokens(self._tokens, start, ["NOT", "NULL"]):
             self.nullable = False
             return start + 2
-        if _is_match_tokens(self.tokens, start, ["NULL"]):
+        if _is_match_tokens(self._tokens, start, ["NULL"]):
             self.nullable = True
             return start + 1
-        if _is_match_tokens(self.tokens, start, ["UNIQUE"]):
+        if _is_match_tokens(self._tokens, start, ["UNIQUE"]):
             self.is_unique = True
             return start + 1
-        if _is_match_tokens(self.tokens, start, ["AUTOINCREMENT"]):
+        if _is_match_tokens(self._tokens, start, ["AUTOINCREMENT"]):
             self.is_autoincrement = True
             return start + 1
-        if _is_match_tokens(self.tokens, start, ["CHECK", "("]):
+        if _is_match_tokens(self._tokens, start, ["CHECK", "("]):
             self.has_check = True
-            _, i = _parse_parentheses(self.tokens, start + 1)
+            _, i = _parse_parentheses(self._tokens, start + 1)
             return i
-        if _is_match_tokens(self.tokens, start, ["DEFAULT"]):
+        if _is_match_tokens(self._tokens, start, ["DEFAULT"]):
             i = start + 1
-            if i < len(self.tokens) and self.tokens[i] == '(':
-                _, i = _parse_parentheses(self.tokens, i)
+            if i < len(self._tokens) and self._tokens[i] == '(':
+                _, i = _parse_parentheses(self._tokens, i)
                 return i
-            return min(i + 1, len(self.tokens))
-        if _is_match_tokens(self.tokens, start, ["COLLATE", None]):
+            return min(i + 1, len(self._tokens))
+        if _is_match_tokens(self._tokens, start, ["COLLATE", None]):
             return start + 2
-        if _is_match_tokens(self.tokens, start, ["REFERENCES", None]):
+        if _is_match_tokens(self._tokens, start, ["REFERENCES", None]):
             i = start + 2
-            if i < len(self.tokens) and self.tokens[i] == '(':
-                _, i = _parse_parentheses(self.tokens, i)
+            if i < len(self._tokens) and self._tokens[i] == '(':
+                _, i = _parse_parentheses(self._tokens, i)
             return i
-        if _is_match_tokens(self.tokens, start, ["GENERATED"]):
+        if _is_match_tokens(self._tokens, start, ["GENERATED"]):
             i = start + 1
-            if _is_match_tokens(self.tokens, i, ["ALWAYS"]):
+            if _is_match_tokens(self._tokens, i, ["ALWAYS"]):
                 i += 1
-            if _is_match_tokens(self.tokens, i, ["AS", "("]):
-                _, i = _parse_parentheses(self.tokens, i + 1)
-            if i < len(self.tokens) and self.tokens[i] in ("VIRTUAL", "STORED"):
+            if _is_match_tokens(self._tokens, i, ["AS", "("]):
+                _, i = _parse_parentheses(self._tokens, i + 1)
+            if i < len(self._tokens) and self._tokens[i] in ("VIRTUAL", "STORED"):
                 i += 1
             return i
         return start + 1
 
     def __repr__(self):
-        return "{}:{}".format(self.name, "/".join(self.tokens))
+        return "{}:{}".format(self.name, self.declared_type)
 
 
 class BaseSchema:
+    __slots__ = ("name", "table_name", "pgno", "sql")
+
     def __init__(self, name, table_name, pgno, sql):
         self.name = name
         self.table_name = table_name
@@ -390,6 +408,17 @@ class BaseSchema:
 
 
 class TableSchema(BaseSchema):
+    __slots__ = (
+        "database",
+        "columns",
+        "primary_keys",
+        "foreign_key_constraints",
+        "check_constraints",
+        "unique_key_constraints",
+        "without_rowid",
+        "strict",
+    )
+
     def __init__(self, name, table_name, pgno, sql, database):
         super().__init__(name, table_name, pgno, sql)
         self.database = database
@@ -398,7 +427,7 @@ class TableSchema(BaseSchema):
         self.foreign_key_constraints = []   # list[(list[str], str, list[str])]
         self.check_constraints = []         # list[str]
         self.unique_key_constraints = []    # list[list[str]]
-        self._table_primary_key_orders = []
+        table_primary_key_orders = []
 
         definitions = self._split_definitions()
         for d in definitions:
@@ -415,7 +444,7 @@ class TableSchema(BaseSchema):
                 self.columns.append(TableColumn(pos, value, tokens, next_i))
             elif tok == TOK_PRIMARY_KEY:
                 self.primary_keys = [v[0] for v in value]
-                self._table_primary_key_orders = [v[1] for v in value]
+                table_primary_key_orders = [v[1] for v in value]
             elif tok == TOK_UNIQUE_KEY:
                 self.unique_key_constraints.append([_unquote_identifier(v[0]) for v in value if v])
             elif tok == TOK_CHECK:
@@ -423,22 +452,28 @@ class TableSchema(BaseSchema):
             elif tok == TOK_FOREIGN_KEY:
                 self.foreign_key_constraints.append(value)
 
-        create_table_option = self.sql[self.sql.rfind(')'):].upper()
-        self.without_rowid = bool(re.search(r'WITHOUT\s+ROWID', create_table_option))
-        self.strict = bool(re.search(r'\bSTRICT\b', create_table_option))
+        create_table_option_tokens = [
+            token.upper()
+            for token in _split_tokens(self.sql[self.sql.rfind(')') + 1:])
+        ]
+        self.without_rowid = any(
+            _is_match_tokens(create_table_option_tokens, i, ["WITHOUT", "ROWID"])
+            for i in range(len(create_table_option_tokens))
+        )
+        self.strict = "STRICT" in create_table_option_tokens
 
         # find primary key
         if not self.primary_keys:
             for c in self.columns:
                 if c.is_primary_key:
                     self.primary_keys.append(c.name)
-                    self._table_primary_key_orders.append(c.primary_key_order)
+                    table_primary_key_orders.append(c.primary_key_order)
 
         # find rowid alias
         if not self.without_rowid and len(self.primary_keys) == 1:
             c = self.get_column_by_name(self.primary_keys[0])
             if c:
-                order = self._table_primary_key_orders[0] if self._table_primary_key_orders else c.primary_key_order
+                order = table_primary_key_orders[0] if table_primary_key_orders else c.primary_key_order
                 if c.declared_type == "INTEGER" and order != -1:
                     c.is_rowid = True
 
@@ -609,18 +644,20 @@ class TableSchema(BaseSchema):
 
 
 class IndexSchema(BaseSchema):
+    __slots__ = ("is_primary_key", "columns", "orders")
+
     def __init__(self, name, table_name, pgno, sql, table_schema):
         super().__init__(name, table_name, pgno, sql)
         if sql:
             self.is_primary_key = False
-            self.tokens = _split_tokens(sql)
-            if _is_match_tokens(self.tokens, 0, ["CREATE", "INDEX", None, "ON", None, "("]):
+            tokens = _split_tokens(sql)
+            if _is_match_tokens(tokens, 0, ["CREATE", "INDEX", None, "ON", None, "("]):
                 start = 5
-            elif _is_match_tokens(self.tokens, 0, ["CREATE", "UNIQUE", "INDEX", None, "ON", None, "("]):
+            elif _is_match_tokens(tokens, 0, ["CREATE", "UNIQUE", "INDEX", None, "ON", None, "("]):
                 start = 6
             else:
-                raise NotImplementedError("Can't parse:{}".format(self.tokens))
-            values, _ = _parse_parentheses(self.tokens, start)
+                raise NotImplementedError("Can't parse:{}".format(tokens))
+            values, _ = _parse_parentheses(tokens, start)
             column_names = [_unquote_identifier(v[0]) for v in values if v]
             self.columns = [table_schema.get_column_by_name(name) for name in column_names]
             # ASC:1 DESC:-1
@@ -635,6 +672,8 @@ class IndexSchema(BaseSchema):
 
 
 class ViewSchema(BaseSchema):
+    __slots__ = ()
+
     def __init__(self, name, table_name, pgno, sql):
         super().__init__(name, table_name, pgno, sql)
 

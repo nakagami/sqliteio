@@ -88,7 +88,7 @@ class Database:
         return None
 
     def get_index_schema_by_column_names(self, table_name, column_names):
-        for idx in self.indexes[table_name]:
+        for idx in self.index_schemas(table_name) or []:
             if tuple([c.name for c in idx.columns]) == tuple(column_names):
                 return idx
         return None
@@ -99,7 +99,7 @@ class Database:
 
     def index_schemas(self, table_name):
         "IndexSchema list by table name"
-        return self.indexes.get(table_name)
+        return self.indexes.get(table_name, [])
 
     def fetch_all(self, table_name):
         "Fetch all table records"
