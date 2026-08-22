@@ -2,8 +2,7 @@ from setuptools import setup
 
 
 classifiers = [
-    'Development Status :: 3 - Alpha',
-    'License :: OSI Approved :: MIT License',
+    'Development Status :: 4 - Beta',
     'Operating System :: OS Independent',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
@@ -13,7 +12,7 @@ classifiers = [
 
 setup(
     name="sqliteio",
-    version="0.3.0",
+    version="0.3.1",
     url='https://github.com/nakagami/sqliteio/',
     classifiers=classifiers,
     keywords=['SQLite3'],
