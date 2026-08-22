@@ -66,6 +66,48 @@ class TestPager(unittest.TestCase):
         self.assertEqual(database.pager.pgno_first_freelist_trunk, 2)
         database.close()
 
+    def test_freelist_append_overflow_creates_next_trunk(self):
+        database = sqliteio.open("testdata/test.sqlite")
+        pager = database.pager
+
+        # allocate pages without freelist
+        trunk_page = pager.new_page()
+        capacity = (pager.page_size - 8) // 4
+        child_pages = [pager.new_page() for _ in range(capacity + 1)]
+
+        pager.add_to_freelist(trunk_page)
+        for child_page in child_pages:
+            pager.add_to_freelist(child_page)
+
+        trunk = pager._first_freelist_trunk()
+        self.assertEqual(trunk.page.pgno, trunk_page.pgno)
+        self.assertEqual(trunk.num_children, capacity)
+        self.assertEqual(trunk.next_trunk_pgno, child_pages[-1].pgno)
+
+        next_trunk = trunk.get_next_trunk()
+        self.assertEqual(next_trunk.page.pgno, child_pages[-1].pgno)
+        self.assertEqual(next_trunk.num_children, 0)
+        self.assertEqual(next_trunk.next_trunk_pgno, 0)
+
+        database.close()
+
+    def test_new_page_pops_empty_trunk_and_advances_head(self):
+        database = sqliteio.open("testdata/test.sqlite")
+        pager = database.pager
+
+        trunk1_page = pager.new_page()
+        trunk2_page = pager.new_page()
+        pager.add_to_freelist(trunk1_page)
+        trunk1 = pager._first_freelist_trunk()
+        trunk1.next_trunk_pgno = trunk2_page.pgno
+
+        page = pager.new_page()
+        self.assertEqual(page.pgno, trunk1_page.pgno)
+        self.assertEqual(pager.pgno_first_freelist_trunk, trunk2_page.pgno)
+        self.assertEqual(pager._first_freelist_trunk().page.pgno, trunk2_page.pgno)
+
+        database.close()
+
 
 class TestBase(unittest.TestCase):
     def assertEqualDB(self, database1, database2):
