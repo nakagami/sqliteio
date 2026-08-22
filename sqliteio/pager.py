@@ -22,42 +22,21 @@
 # SOFTWARE.
 ################################################################################
 import binascii
-from .btree import (
-    BTREE_PAGE_TYPE_LEAF_TABLE,
-    BTREE_PAGE_TYPE_INTERIOR_TABLE,
-    BTREE_PAGE_TYPE_LEAF_INDEX,
-    BTREE_PAGE_TYPE_INTERIOR_INDEX,
-    BTREE_PAGE_TYPE_FREE_PAGE,
-    BTREE_PAGE_TYPE_RAW_PAGE,
-    TableLeafNode,
-    TableInteriorNode,
-    IndexLeafNode,
-    IndexInteriorNode,
-    FreePage,
-    RawPage,
-)
 
 
-__all__ = ("Page", "Pager")
+__all__ = ("Page", "Pager", "FreePage")
 
 
 class Page:
-    def __init__(self, pager, pgno, data, page_type):
+    def __init__(self, pager, pgno, data):
         self.pager = pager
         self.pgno = pgno
         self.data = bytearray(data)
-        self.page_type = page_type
         self.is_dirty = False
 
         self.page_offset = 0
         if self.pgno == 1:
             self.page_offset = 100
-        if self.page_type is None:
-            if self.data[self.page_offset]:
-                self.page_type = self.data[self.page_offset]
-            else:
-                self.page_type = BTREE_PAGE_TYPE_RAW_PAGE
-        assert self.page_type is not None
 
     def _dump(self):
         print("  pgno=", self.pgno)
@@ -85,32 +64,80 @@ class Page:
         self.data[offset:offset + len(data)] = data
         self.is_dirty = True
 
-    def initialize_page(self, page_type):
-        "Initialize page as page_type page"
-        self.page_type = page_type
-        self.data[self.page_offset:self.pager.page_size-self.page_offset] = b'\x00' * (self.pager.page_size-self.page_offset)
-        if page_type in (
-            BTREE_PAGE_TYPE_LEAF_TABLE,
-            BTREE_PAGE_TYPE_INTERIOR_TABLE,
-            BTREE_PAGE_TYPE_LEAF_INDEX,
-            BTREE_PAGE_TYPE_INTERIOR_INDEX,
-        ):
-            self.data[self.page_offset] = page_type
+    def initialize(self):
+        "Initialize page as an empty page"
+        self.data[self.page_offset:] = b'\x00' * (len(self.data) - self.page_offset)
         self.is_dirty = True
-
-    def get_node(self):
-        "Get page btree node instance"
-        return {
-            BTREE_PAGE_TYPE_LEAF_TABLE: TableLeafNode,
-            BTREE_PAGE_TYPE_INTERIOR_TABLE: TableInteriorNode,
-            BTREE_PAGE_TYPE_LEAF_INDEX: IndexLeafNode,
-            BTREE_PAGE_TYPE_INTERIOR_INDEX: IndexInteriorNode,
-            BTREE_PAGE_TYPE_FREE_PAGE: FreePage,
-            BTREE_PAGE_TYPE_RAW_PAGE: RawPage,
-        }[self.page_type](self)
 
     def __str__(self):
         return "page{}".format(self.pgno)
+
+
+class FreePage:
+    "freelist trunk page"
+    def __init__(self, page):
+        self.page = page
+
+    def __eq__(self, other):
+        return other and self.page.data[:8+(self.num_children*4)] == other.page.data[:8+(self.num_children*4)]
+
+    def _dump(self):
+        print("FreePage")
+        print("\tnext_page={},{}".format(self.next_trunk_pgno, self.child_pgno_list()))
+
+    @property
+    def next_trunk_pgno(self):
+        return int.from_bytes(self.page.data[:4], 'big')
+
+    @next_trunk_pgno.setter
+    def next_trunk_pgno(self, v):
+        self.page.write(v.to_bytes(4, "big"), 0)
+
+    @property
+    def num_children(self):
+        return int.from_bytes(self.page.data[4:8], 'big')
+
+    @num_children.setter
+    def num_children(self, v):
+        self.page.write(v.to_bytes(4, "big"), 4)
+
+    def child_pgno_list(self):
+        # free page number list
+        pgno_list = []
+        for i in range(self.num_children):
+            pgno = int.from_bytes(self.page.data[8 + i * 4:12 + i * 4], 'big')
+            pgno_list.append(pgno)
+        return pgno_list
+
+    def get_next_trunk(self):
+        if self.next_trunk_pgno == 0:
+            return None
+        return FreePage(self.page.pager.get_page(self.next_trunk_pgno))
+
+    def append_free_page(self, free_page):
+        trunk = self
+        while self.page.pager.page_size == 8 + trunk.num_children * 4:
+            next_trunk = trunk.get_next_trunk()
+            if next_trunk is None:
+                # use free_page as a new trunk page
+                trunk.next_trunk_pgno = free_page.pgno
+                return
+            trunk = next_trunk
+        trunk.page.write(free_page.pgno.to_bytes(4, "big"), 8 + trunk.num_children * 4)
+        trunk.num_children += 1
+
+    def pop_free_page(self):
+        if self.num_children:
+            self.num_children -= 1
+            pgno = int.from_bytes(
+                self.page.data[8 + self.num_children * 4:12 + self.num_children * 4], 'big'
+            )
+            self.page.write(b'\x00' * 4, 8 + self.num_children * 4)
+            free_page = self.page.pager.get_page(pgno)
+        else:
+            self.page.pager.pgno_first_freelist_trunk = self.next_trunk_pgno
+            free_page = self.page
+        return free_page
 
 
 class Pager:
@@ -156,35 +183,6 @@ class Pager:
     def remove_page(self, pgno):
         self.pages[pgno] = None
 
-    def find_rowid_table_path(self, pgno, rowid):
-        """find ancestors TableInteriorNode list, TableLeafNode and cell index in that TableLeafNode
-        return (list_of_interior_nodes, table_leaf_node, cell_index, found_or_not)
-        matched record is one at most.
-        """
-        return self.get_page(pgno).get_node().find_rowid_table_path(rowid, [])
-
-    def find_rowid_index_path(self, pgno, key, rowid, orders, recurse_to_leaf):
-        """find ancestors IndexInteriorNode list, IndexLeafNode and cell index in that IndexLeafNode
-        return (list_of_interior_nodes, index_leaf_node, cell_index, found_or_not)
-        if found_or_not is True (=find record) return first record.
-        """
-        return self.get_page(pgno).get_node().find_rowid_index_path(key, rowid, orders, [], recurse_to_leaf)
-
-    def rowid_range_records(self, pgno, min_rowid, max_rowid, converter=lambda rowid, record: (rowid, record)):
-        "fetch table records by rowid range"
-        return self.get_page(pgno).get_node().rowid_range_records(min_rowid, max_rowid, converter)
-
-    def index_range_records(
-        self, pgno, min_key, max_key, orders, positions, converter=lambda rowid, record: (rowid, record)
-    ):
-        "fetch table records by index range"
-        node = self.get_page(pgno).get_node()
-        return node.index_range_records(min_key, max_key, orders, positions, converter)
-
-    def records(self, pgno, converter=lambda rowid, record: (rowid, record)):
-        "fetch pgno table/index tree all records"
-        return self.get_page(pgno).get_node().records(converter)
-
     # header variables
     @property
     def file_change_counter(self):
@@ -224,13 +222,13 @@ class Pager:
         self.database.fileobj.close()
         self.database.fileobj = None
 
-    def get_page(self, pgno, page_type=None):
+    def get_page(self, pgno):
         "get pgno page"
         if pgno <= self.max_pgno:
             if not (page := self.pages.get(pgno)):
                 # read page block
                 self.database.fileobj.seek((pgno - 1) * self.page_size, 0)
-                page = Page(self, pgno, self.database.fileobj.read(self.page_size), page_type)
+                page = Page(self, pgno, self.database.fileobj.read(self.page_size))
             return page
         return None
 
@@ -243,23 +241,22 @@ class Pager:
     def _first_freelist_trunk(self):
         if self.pgno_first_freelist_trunk == 0:
             return None
-        return self.get_page(self.pgno_first_freelist_trunk, page_type=BTREE_PAGE_TYPE_FREE_PAGE).get_node()
+        return FreePage(self.get_page(self.pgno_first_freelist_trunk))
 
-    def new_page(self, page_type=BTREE_PAGE_TYPE_FREE_PAGE):
-        "get page from freelist or allocate new page and return new page"
+    def new_page(self):
+        "get page from freelist or allocate new page and return new empty page"
         freelist_trunk = self._first_freelist_trunk()
         if freelist_trunk:
             page = freelist_trunk.pop_free_page()
         else:
             self.max_pgno += 1
-            pgno = self.max_pgno
-            page = Page(self, pgno, b'\x00' * self.page_size, BTREE_PAGE_TYPE_FREE_PAGE)
-        page.initialize_page(page_type)
+            page = Page(self, self.max_pgno, b'\x00' * self.page_size)
+        page.initialize()
         return page
 
     def add_to_freelist(self, page):
         "add page to free list"
-        page.initialize_page(BTREE_PAGE_TYPE_FREE_PAGE)
+        page.initialize()
         freelist_trunk = self._first_freelist_trunk()
         if not freelist_trunk:
             self.pgno_first_freelist_trunk = page.pgno

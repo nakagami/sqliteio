@@ -25,7 +25,6 @@ import binascii
 from .record import varint_and_next_index, to_varint, decode_payload, pack_value_list
 
 BTREE_PAGE_TYPE_RAW_PAGE = -1       # pseudo number
-BTREE_PAGE_TYPE_FREE_PAGE = 0       # pseudo number
 BTREE_PAGE_TYPE_INTERIOR_INDEX = 2
 BTREE_PAGE_TYPE_INTERIOR_TABLE = 5
 BTREE_PAGE_TYPE_LEAF_INDEX = 10
@@ -33,6 +32,7 @@ BTREE_PAGE_TYPE_LEAF_TABLE = 13
 
 
 __all__ = (
+    "BTree",
     "swap_node",
     "TableLeafCell",
     "TableInteriorCell",
@@ -41,18 +41,16 @@ __all__ = (
     "TableLeafNode",
     "IndexLeafNode",
     "IndexInteriorNode",
-    "FreePage",
     "RawPage",
 )
 
 
 def swap_node(node1, node2):
     "swap node page"
-    page1 = node1.pager.get_page(node1.pgno)
-    page2 = node2.pager.get_page(node2.pgno)
+    page1 = node1.btree.pager.get_page(node1.pgno)
+    page2 = node2.btree.pager.get_page(node2.pgno)
     page1.data, page2.data = page2.data, page1.data
-    page1.page_type, page2.page_type = page2.page_type, page1.page_type
-    return page1.get_node(), page2.get_node()
+    return node1.btree.get_node(node1.pgno), node2.btree.get_node(node2.pgno)
 
 
 class CellPayload:
@@ -156,12 +154,18 @@ class IndexInteriorCell(Cell):
 
 
 class BTreeNode:
-    def __init__(self, page):
+    page_type = None
+
+    def __init__(self, btree, page):
+        self.btree = btree
         self.pgno = page.pgno
-        self.pager = page.pager
         self.page_offset = 0
         if page.pgno == 1:
             self.page_offset = 100
+
+    @property
+    def pager(self):
+        return self.btree.pager
 
     def __str__(self):
         return "{}({})".format(self.__class__.__name__, self.pgno)
@@ -176,14 +180,13 @@ class BTreeNode:
             TableInteriorNode: "InteriorTable",
             IndexLeafNode: "LeafIndex",
             IndexInteriorNode: "InteriorIndex",
-            FreePage: "FreePage",
             RawPage: "RawPage",
         }[type(self)])
         print("  free_block_offset=", hex(self.free_block_offset))
         print("  number_of_cells=", self.number_of_cells)
         print("  first_byte_of_cell_content=", hex(self.first_byte_of_cell_content))
         print("  number_of_fragmented_free_bytes=", self.number_of_fragmented_free_bytes)
-        if self.page.page_type in (BTREE_PAGE_TYPE_INTERIOR_INDEX, BTREE_PAGE_TYPE_INTERIOR_TABLE):
+        if self.page_type in (BTREE_PAGE_TYPE_INTERIOR_INDEX, BTREE_PAGE_TYPE_INTERIOR_TABLE):
             print("  right_most=", self.right_most)
         print("  cell_pointers=", [hex(i) for i in self.read_cell_pointers()])
         if self.free_block_offset:
@@ -225,11 +228,11 @@ class BTreeNode:
         return False
 
     def _write_page(self, data, offset):
-        self.pager.get_page(self.pgno).write(data, offset)
+        self.page.write(data, offset)
 
     @property
     def page(self):
-        return self.pager.get_page(self.pgno)
+        return self.btree.pager.get_page(self.pgno)
 
     @property
     def free_block_offset(self):
@@ -265,12 +268,12 @@ class BTreeNode:
 
     @property
     def right_most(self):
-        assert self.page.page_type in (BTREE_PAGE_TYPE_INTERIOR_INDEX, BTREE_PAGE_TYPE_INTERIOR_TABLE)
+        assert self.page_type in (BTREE_PAGE_TYPE_INTERIOR_INDEX, BTREE_PAGE_TYPE_INTERIOR_TABLE)
         return int.from_bytes(self.page.data[self.page_offset+8:self.page_offset+12], 'big')
 
     @right_most.setter
     def right_most(self, v):
-        assert self.page.page_type in (BTREE_PAGE_TYPE_INTERIOR_INDEX, BTREE_PAGE_TYPE_INTERIOR_TABLE)
+        assert self.page_type in (BTREE_PAGE_TYPE_INTERIOR_INDEX, BTREE_PAGE_TYPE_INTERIOR_TABLE)
         self._write_page(v.to_bytes(4, "big"), self.page_offset + 8)
 
     def _first_payload_and_trailing(self, r):
@@ -287,12 +290,12 @@ class BTreeNode:
         assert len(first_payload) > 0
         assert len(trailing_pages) > 0
 
-        next_page = self.pager.new_page(BTREE_PAGE_TYPE_RAW_PAGE)
+        next_page = self.btree.new_page()
         first_next_pgno = next_page.pgno
         p = trailing_pages.pop(0)
         next_page.data[4:len(p)+4] = p
         while trailing_pages:
-            next_next_page = self.pager.new_page(BTREE_PAGE_TYPE_RAW_PAGE)
+            next_next_page = self.btree.new_page()
             next_page.data[0:4] = next_next_page.pgno.to_bytes(4, "big")
             p = trailing_pages.pop(0)
             next_next_page.data[4:len(p)+4] = p
@@ -456,11 +459,13 @@ class InteriorNodeMixIn:
 
 
 class TableLeafNode(BTreeNode, LeafNodeMixIn):
+    page_type = BTREE_PAGE_TYPE_LEAF_TABLE
+
     def _update_cells(self):
         self.cells = [TableLeafCell(self, c) for c in self.read_cell_pointers()]
 
-    def __init__(self, page):
-        super().__init__(page)
+    def __init__(self, btree, page):
+        super().__init__(btree, page)
         self._update_cells()
 
     def __eq__(self, other):
@@ -498,9 +503,7 @@ class TableLeafNode(BTreeNode, LeafNodeMixIn):
         assert self.number_of_cells >= cell_index
 
         # create new empty node
-        new_page = self.page.pager.new_page()
-        new_page.initialize_page(self.page.page_type)
-        new_node = new_page.get_node()
+        new_node = self.btree.new_node(self.page_type)
 
         # copy right cells to new_node
         for i in range(cell_index, self.number_of_cells):
@@ -564,15 +567,13 @@ class TableLeafNode(BTreeNode, LeafNodeMixIn):
 
 
 class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
-    @classmethod
-    def new_node(cls, pager):
-        return pager.new_page(BTREE_PAGE_TYPE_INTERIOR_TABLE).get_node()
+    page_type = BTREE_PAGE_TYPE_INTERIOR_TABLE
 
     def _update_cells(self):
         self.cells = [TableInteriorCell(self, c) for c in self.read_cell_pointers()]
 
-    def __init__(self, page):
-        super().__init__(page)
+    def __init__(self, btree, page):
+        super().__init__(btree, page)
         self._update_cells()
 
     def _dump(self):
@@ -591,9 +592,7 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
         assert self.number_of_cells >= cell_index
 
         # create new empty node
-        new_page = self.page.pager.new_page()
-        new_page.initialize_page(self.page.page_type)
-        new_node = new_page.get_node()
+        new_node = self.btree.new_node(self.page_type)
 
         # copy right cells to new_node
         for i in range(cell_index, self.number_of_cells):
@@ -634,11 +633,11 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
             if rowid > cell.key:
                 break
             ancestors.append(self)
-            node = self.page.pager.get_page(cell.left_page).get_node()
+            node = self.btree.get_node(cell.left_page)
             return node.find_rowid_table_path(rowid, ancestors)
         if rowid > self.cells[-1].key:
             ancestors.append(self)
-            node = self.page.pager.get_page(self.right_most).get_node()
+            node = self.btree.get_node(self.right_most)
             return node.find_rowid_table_path(rowid, ancestors)
         raise ValueError("Unexpected node:{}".format(self.page.pgno))
 
@@ -648,37 +647,38 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
                 continue
             if max_rowid > cell.key:
                 break
-            node = self.page.pager.get_page(cell.left_page).get_node()
+            node = self.btree.get_node(cell.left_page)
             for r in node.rowid_range_records(min_rowid, max_rowid, converter):
                 yield r
         if max_rowid > self.cells[-1].key:
-            node = self.page.pager.get_page(self.right_most).get_node()
+            node = self.btree.get_node(self.right_most)
             for r in node.rowid_range_records(min_rowid, max_rowid, converter):
                 yield r
 
     def records(self, converter):
         for cell in self.cells:
-            node = self.page.pager.get_page(cell.left_page).get_node()
+            node = self.btree.get_node(cell.left_page)
             for r in node.records(converter):
                 yield r
-        node = self.page.pager.get_page(self.right_most).get_node()
+        node = self.btree.get_node(self.right_most)
         for r in node.records(converter):
             yield r
 
     def merge_children(self):
-        page = self.pager.get_page(self.pgno)
-        children = [self.pager.get_page(c.left_page).get_node() for c in self.cells]
+        page = self.page
+        children = [self.btree.get_node(c.left_page) for c in self.cells]
         if self.right_most:
-            children.append(self.pager.get_page(self.right_most).get_node())
+            children.append(self.btree.get_node(self.right_most))
         amount_of_page_size = self.page_offset + 8
         for child in children:
             amount_of_page_size += (child.number_of_cells * 2) + sum([c.size for c in child.cells])
-        if amount_of_page_size > self.page.pager.page_size:
+        if amount_of_page_size > self.pager.page_size:
             return
 
         # merge children and remove TableInteriorNode
-        page.initialize_page(BTREE_PAGE_TYPE_LEAF_TABLE)
-        table_leaf_node = page.get_node()
+        page.initialize()
+        page.write(bytes([BTREE_PAGE_TYPE_LEAF_TABLE]), page.page_offset)
+        table_leaf_node = self.btree.get_node(self.pgno)
         for child in children:
             for cell in child.cells:
                 table_leaf_node.append_cell_from(child, cell)
@@ -689,12 +689,13 @@ class TableInteriorNode(BTreeNode, InteriorNodeMixIn):
 
 
 class IndexLeafNode(BTreeNode, LeafNodeMixIn):
+    page_type = BTREE_PAGE_TYPE_LEAF_INDEX
+
     def _update_cells(self):
-        self.cells = [self._parse_index_leaf(c) for c in self.read_cell_pointers()]
         self.cells = [IndexLeafCell(self, c) for c in self.read_cell_pointers()]
 
-    def __init__(self, page):
-        super().__init__(page)
+    def __init__(self, btree, page):
+        super().__init__(btree, page)
         self._update_cells()
 
     def __eq__(self, other):
@@ -726,9 +727,7 @@ class IndexLeafNode(BTreeNode, LeafNodeMixIn):
         cell_block = self.cells[cell_index].cell_block
 
         # create new empty node
-        new_page = self.page.pager.new_page()
-        new_page.initialize_page(self.page.page_type)
-        new_node = new_page.get_node()
+        new_node = self.btree.new_node(self.page_type)
 
         for i in range(cell_index+1, self.number_of_cells):
             new_node.append_cell_from(self, self.cells[i])
@@ -756,10 +755,6 @@ class IndexLeafNode(BTreeNode, LeafNodeMixIn):
 
     def insert(self, rowid, key, cell_index, cell_block):
         self.insert_cell_block(cell_index, cell_block)
-
-    def _parse_index_leaf(self, cell_pointer):
-        payload_len, next_i = varint_and_next_index(self.page.data, cell_pointer)
-        return CellPayload(self, cell_pointer, payload_len, self.page.data[next_i:])
 
     def max_in_page_payload(self):
         return ((self.pager.page_size-12)*64//255)-2
@@ -795,15 +790,13 @@ class IndexLeafNode(BTreeNode, LeafNodeMixIn):
 
 
 class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
-    @classmethod
-    def new_node(cls, pager):
-        return pager.new_page(BTREE_PAGE_TYPE_INTERIOR_INDEX).get_node()
+    page_type = BTREE_PAGE_TYPE_INTERIOR_INDEX
 
     def _update_cells(self):
         self.cells = [IndexInteriorCell(self, c) for c in self.read_cell_pointers()]
 
-    def __init__(self, page):
-        super().__init__(page)
+    def __init__(self, btree, page):
+        super().__init__(btree, page)
         self._update_cells()
 
     def _dump(self):
@@ -823,9 +816,7 @@ class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
         left_page = self.cells[cell_index].left_page
 
         # create new empty node
-        new_page = self.page.pager.new_page()
-        new_page.initialize_page(self.page.page_type)
-        new_node = new_page.get_node()
+        new_node = self.btree.new_node(self.page_type)
 
         for i in range(cell_index+1, self.number_of_cells):
             new_node.append_cell_from(self, self.cells[i])
@@ -834,7 +825,7 @@ class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
         new_node.right_most = self.right_most
         self.right_most = left_page
         if len(ancestors) == 0:
-            parent = IndexInteriorNode.new_node(self.page.pager)
+            parent = self.btree.new_node(BTREE_PAGE_TYPE_INTERIOR_INDEX)
             elder, parent = swap_node(parent, self)
             new_node, elder = swap_node(elder, new_node)
         else:
@@ -854,7 +845,7 @@ class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
                 if record[-1] == rowid:
                     ancestors.append(self)
                     return ancestors, None, i, True
-                node = self.page.pager.get_page(cell.left_page).get_node()
+                node = self.btree.get_node(cell.left_page)
                 ancestors2, leaf2, idx2, found = node.find_rowid_index_path(
                     key, rowid, orders, ancestors + [self], recurse_to_leaf
                 )
@@ -865,12 +856,12 @@ class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
             elif cmp < 0:
                 ancestors.append(self)
                 if recurse_to_leaf:
-                    node = self.page.pager.get_page(cell.left_page).get_node()
+                    node = self.btree.get_node(cell.left_page)
                     return node.find_rowid_index_path(key, rowid, orders, ancestors, recurse_to_leaf)
                 else:
                     return ancestors, None, i, False
         ancestors.append(self)
-        node = self.page.pager.get_page(self.right_most).get_node()
+        node = self.btree.get_node(self.right_most)
         return node.find_rowid_index_path(key, rowid, orders, ancestors, recurse_to_leaf)
 
     def index_range_records(self, min_key, max_key, orders, positions, converter):
@@ -884,99 +875,89 @@ class IndexInteriorNode(BTreeNode, InteriorNodeMixIn):
                 continue
             elif max_cmp > 0:
                 break
-            node = self.page.pager.get_page(cell.left_page).get_node()
+            node = self.btree.get_node(cell.left_page)
             for r in node.index_range_records(min_key, max_key, orders, positions, converter):
                 yield r
         record = decode_payload(self.cells[-1].cell_payload.get_payload_with_overflow())
         if self._cmp_key(max_key, record, positions, orders) > 0:
-            node = self.page.pager.get_page(self.right_most).get_node()
+            node = self.btree.get_node(self.right_most)
             for r in node.index_range_records(min_key, max_key, orders, positions, converter):
                 yield r
 
     def records(self, converter):
         for cell in self.cells:
-            node = self.page.pager.get_page(cell.left_page).get_node()
+            node = self.btree.get_node(cell.left_page)
             for r in node.records(converter):
                 yield r
-        node = self.page.pager.get_page(self.right_most).get_node()
+        node = self.btree.get_node(self.right_most)
         for r in node.records(converter):
             yield r
 
 
-class FreePage(BTreeNode):
-    def __init__(self, page):
-        super().__init__(page)
-
-    def __eq__(self, other):
-        return other and self.page.data[:8+(self.num_children*4)] == other.page.data[:8+(self.num_children*4)]
-
-    def _dump(self):
-        print("FreePage")
-        print("\tnext_page={},{}".format(self.next_trunk_pgno, self.child_pgno_list()))
-
-    @property
-    def next_trunk_pgno(self):
-        return int.from_bytes(self.page.data[:4], 'big')
-
-    @next_trunk_pgno.setter
-    def next_trunk_pgno(self, v):
-        self._write_page(v.to_bytes(4, "big"), 0)
-
-    @property
-    def num_children(self):
-        return int.from_bytes(self.page.data[4:8], 'big')
-
-    @num_children.setter
-    def num_children(self, v):
-        self._write_page(v.to_bytes(4, "big"), 4)
-
-    def child_pgno_list(self):
-        # free page number list
-        pgno_list = []
-        for i in range(self.num_children):
-            pgno = int.from_bytes(self.page.data[8 + i * 4:12 + i * 4], 'big')
-            pgno_list.append(pgno)
-        return pgno_list
-
-    def get_next_trunk(self):
-        if self.next_trunk_pgno == 0:
-            return None
-        page = self.page.pager.get_page(self.next_trunk_pgno, page_type=BTREE_PAGE_TYPE_FREE_PAGE)
-        node = page.get_node()
-        assert isinstance(node, FreePage)
-        return node
-
-    def append_free_page(self, free_page):
-        page = self.pager.get_page(self.pgno)
-        trunk = page.get_node()
-        while self.pager.page_size == 8 + trunk.num_children * 4:
-            if trunk.get_next_trunk() is None:
-                # append new FreePage
-                new_trunk = FreePage(free_page.page)
-                trunk.next_trunk_pgno = new_trunk.page.pgno
-                return
-            trunk = trunk.get_next_trunk()
-        self._write_page(free_page.pgno.to_bytes(4, "big"), 8 + trunk.num_children * 4)
-        trunk.num_children += 1
-
-    def pop_free_page(self):
-        if self.num_children:
-            self.num_children -= 1
-            pgno = int.from_bytes(
-                self.page.data[8 + self.num_children * 4:12 + self.num_children * 4]
-            )
-            self.page.data[8 + self.num_children * 4:12 + self.num_children * 4] = b'\x00' * 4
-            free_page = self.page.pager.get_page(pgno)
-        else:
-            self.page.pager.pgno_first_freelist_trunk = self.next_trunk_pgno
-            self.page.initialize_page(BTREE_PAGE_TYPE_FREE_PAGE)
-            free_page = self.page
-        return free_page
-
-
 class RawPage(BTreeNode):
-    def __init__(self, page):
-        super().__init__(page)
+    page_type = BTREE_PAGE_TYPE_RAW_PAGE
+
+    def __init__(self, btree, page):
+        super().__init__(btree, page)
 
     def _dump(self):
         print("RawPage")
+
+
+class BTree:
+    "BTree layer over Pager: tree traversal and node management"
+    def __init__(self, pager):
+        self.pager = pager
+
+    def get_node(self, pgno):
+        "Get pgno page's btree node instance"
+        page = self.pager.get_page(pgno)
+        page_type = page.data[page.page_offset]
+        if page_type == 0:
+            page_type = BTREE_PAGE_TYPE_RAW_PAGE
+        return {
+            BTREE_PAGE_TYPE_LEAF_TABLE: TableLeafNode,
+            BTREE_PAGE_TYPE_INTERIOR_TABLE: TableInteriorNode,
+            BTREE_PAGE_TYPE_LEAF_INDEX: IndexLeafNode,
+            BTREE_PAGE_TYPE_INTERIOR_INDEX: IndexInteriorNode,
+            BTREE_PAGE_TYPE_RAW_PAGE: RawPage,
+        }[page_type](self, page)
+
+    def new_page(self):
+        "allocate a new raw page"
+        return self.pager.new_page()
+
+    def new_node(self, page_type):
+        "allocate a new page and initialize it as a page_type btree node"
+        page = self.pager.new_page()
+        page.write(bytes([page_type]), page.page_offset)
+        return self.get_node(page.pgno)
+
+    def find_rowid_table_path(self, pgno, rowid):
+        """find ancestors TableInteriorNode list, TableLeafNode and cell index in that TableLeafNode
+        return (list_of_interior_nodes, table_leaf_node, cell_index, found_or_not)
+        matched record is one at most.
+        """
+        return self.get_node(pgno).find_rowid_table_path(rowid, [])
+
+    def find_rowid_index_path(self, pgno, key, rowid, orders, recurse_to_leaf):
+        """find ancestors IndexInteriorNode list, IndexLeafNode and cell index in that IndexLeafNode
+        return (list_of_interior_nodes, index_leaf_node, cell_index, found_or_not)
+        if found_or_not is True (=find record) return first record.
+        """
+        return self.get_node(pgno).find_rowid_index_path(key, rowid, orders, [], recurse_to_leaf)
+
+    def rowid_range_records(self, pgno, min_rowid, max_rowid, converter=lambda rowid, record: (rowid, record)):
+        "fetch table records by rowid range"
+        return self.get_node(pgno).rowid_range_records(min_rowid, max_rowid, converter)
+
+    def index_range_records(
+        self, pgno, min_key, max_key, orders, positions, converter=lambda rowid, record: (rowid, record)
+    ):
+        "fetch table records by index range"
+        node = self.get_node(pgno)
+        return node.index_range_records(min_key, max_key, orders, positions, converter)
+
+    def records(self, pgno, converter=lambda rowid, record: (rowid, record)):
+        "fetch pgno table/index tree all records"
+        return self.get_node(pgno).records(converter)

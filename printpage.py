@@ -46,7 +46,7 @@ def print_page(path):
             continue
 
         page = pager.get_page(pgno)
-        node = page.get_node()
+        node = database.btree.get_node(pgno)
         if node:
             node._dump()
         page._dump()

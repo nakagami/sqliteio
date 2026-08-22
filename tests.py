@@ -73,8 +73,8 @@ class TestBase(unittest.TestCase):
         for i in range(2, database1.pager.max_pgno+1):
             page1 = database1.pager.get_page(i)
             page2 = database2.pager.get_page(i)
-            node1 = page1.get_node()
-            node2 = page2.get_node()
+            node1 = database1.btree.get_node(i)
+            node2 = database2.btree.get_node(i)
             if node1 and node2:
                 if node1 != node2:
                     page1._dump()
@@ -95,7 +95,7 @@ class TestNode(TestBase):
 
         # split leaf table node
         table_schema = database.tables.get("test_table")
-        ancestors, leaf, cell_index, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, cell_index, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(cell_index, 0)
         self.assertEqual(found, True)
         self.assertEqual(leaf.number_of_cells, 2)
@@ -105,7 +105,7 @@ class TestNode(TestBase):
         self.assertEqual(new_node.number_of_cells, 2)
 
         database.rollback()
-        ancestors, leaf, cell_index, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, cell_index, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
 
         new_node = leaf.split_by_index(1)
         self.assertEqual(leaf.number_of_cells, 1)
@@ -115,7 +115,7 @@ class TestNode(TestBase):
 
     def test_split_index_leaf(self):
         database = sqliteio.open("testdata/many_record15.sqlite")
-        index_leaf = database.pager.get_page(4).get_node()
+        index_leaf = database.btree.get_node(4)
 
         self.assertEqual(index_leaf.number_of_cells, 15)
 
@@ -131,7 +131,7 @@ class TestNode(TestBase):
 
     def test_find_rowid_index_path(self):
         database = sqliteio.open("testdata/many_record333.sqlite")
-        index_interior = database.pager.get_page(4).get_node()
+        index_interior = database.btree.get_node(4)
         index_ancestors, index_leaf, index_leaf_cell_index, found = index_interior.find_rowid_index_path(
             ['aaaaaaaaaaaaaaaaaaaaaaaaaa'],
             334,
@@ -219,28 +219,28 @@ class TestBasic(TestBase):
         self.assertEqual(list(database.filter("test_table", {"a": 1, "b": "A"})), expect)
 
         # find_rowid_table_path
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 2, False))
 
         # find_rowid_index_path
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['A', 1], 1, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 3, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['A', 1], 2, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 4, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['E', 5], 5, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 0, False))
@@ -268,28 +268,28 @@ class TestBasic(TestBase):
         )
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 2, False))
 
         # find_rowid_index_path
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['A', 1], 1, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 3, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['B', 2], 2, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 2, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['C', 3], 3, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 1, True))
@@ -309,28 +309,28 @@ class TestBasic(TestBase):
         )
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 2, False))
 
         # find_rowid_index_path
         index_schema = database.get_index_schema_by_name("test_idx_b_c")
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['A', 1], 1, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 2, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['B', 2], 2, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 2, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['C', 3], 3, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 3, 1, True))
@@ -350,15 +350,15 @@ class TestBasic(TestBase):
         )
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, False))
 
         database.close()
@@ -375,15 +375,15 @@ class TestBasic(TestBase):
         )
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 2, False))
 
         database.close()
@@ -400,15 +400,15 @@ class TestBasic(TestBase):
         )
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 2, False))
 
         database.close()
@@ -425,15 +425,15 @@ class TestBasic(TestBase):
         )
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 4, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2], 5, 1, False))
 
         database.close()
@@ -445,15 +445,15 @@ class TestBasic(TestBase):
         self.assertEqual(list(database.fetch_all("test_table")), [])
 
         table_schema = database.table_schema("test_table")
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 2)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 2)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 3)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 3)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 4)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 4)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, False))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 5)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 5)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([], 2, 0, False))
 
         database.close()
@@ -723,49 +723,49 @@ class TestBasic(TestBase):
         table_schema = database.table_schema("many_record_table")
 
         # find_rowid_table_path()
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2, 203], 6, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 500)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 500)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2, 204], 119, 9, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 997)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 997)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2, 204], 239, 12, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 998)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 998)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2, 204], 241, 0, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 999)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 999)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2, 204], 241, 1, True))
-        ancestors, leaf, pos, found = database.pager.find_rowid_table_path(table_schema.pgno, 1000)
+        ancestors, leaf, pos, found = database.btree.find_rowid_table_path(table_schema.pgno, 1000)
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([2, 204], 241, 2, False))
 
         # find_rowid_index_path
         # index record on IndexInteriorRecord
         index_schema = database.get_index_schema_by_name("many_record_idx_c")
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['zzzzzzzzzzzzzzzzzzzzzzzzzz'], 723, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf, pos, found), ([3], None, 3, True))
         # index record on IndexLeafRecord
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['zzzzzzzzzzzzzzzzzzzzzzzzzz'], 734, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([3, 189], 175, 10, True))
 
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['AAAAAAAAAAAAAAAAAAAAAAAAAA'], 1, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([3, 54], 10, 0, False))
 
         index_schema = database.get_index_schema_by_name("many_record_idx_c_desc")
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['zzzzzzzzzzzzzzzzzzzzzzzzzz'], 723, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([4, 51], 170, 0, True))
         # index record on IndexLeafRecord
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['zzzzzzzzzzzzzzzzzzzzzzzzzz'], 734, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([4, 51], 170, 11, True))
 
-        ancestors, leaf, pos, found = database.pager.find_rowid_index_path(
+        ancestors, leaf, pos, found = database.btree.find_rowid_index_path(
             index_schema.pgno, ['AAAAAAAAAAAAAAAAAAAAAAAAAA'], 1, index_schema.orders, True
         )
         self.assertEqual(([p.page.pgno for p in ancestors], leaf.page.pgno, pos, found), ([4, 142], 78, 14, False))
