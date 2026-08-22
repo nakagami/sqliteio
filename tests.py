@@ -59,6 +59,46 @@ class TestRecord(unittest.TestCase):
         test.close()
 
 
+class TestSchema(unittest.TestCase):
+    def test_schema_parser_sqlite_compatibility(self):
+        database = sqliteio.open("testdata/schema_edge.sqlite")
+
+        table_schema = database.table_schema("t_constraint_pk")
+        self.assertEqual(table_schema.primary_keys, ["a"])
+        self.assertEqual(table_schema.get_column_by_name("a").is_rowid, True)
+        self.assertEqual(database.get_by_pk("t_constraint_pk", 1), (1, {'a': 1, 'b': 'A'}))
+
+        table_schema = database.table_schema("t_no_type")
+        self.assertEqual(table_schema.primary_keys, ["a"])
+        self.assertEqual(table_schema.get_column_by_name("a").is_rowid, False)
+        self.assertEqual(database.get_by_pk("t_no_type", "K1"), (1, {'a': 'K1', 'b': 'A'}))
+
+        table_schema = database.table_schema("t_custom_type")
+        self.assertEqual(table_schema.primary_keys, ["a"])
+        self.assertEqual([c.name for c in table_schema.columns], ["a", "b"])
+        self.assertEqual(database.get_by_pk("t_custom_type", "u1"), (1, {'a': 'u1', 'b': 'x,y'}))
+
+        table_schema = database.table_schema("t_bracket")
+        self.assertEqual([c.name for c in table_schema.columns], ["a b", "text col"])
+        self.assertEqual(table_schema.get_column_by_name("a b").is_rowid, True)
+        self.assertEqual(database.get_by_pk("t_bracket", 1), (1, {'a b': 1, 'text col': 'B'}))
+
+        table_schema = database.table_schema("t_pk_desc")
+        self.assertEqual(table_schema.primary_keys, ["a"])
+        self.assertEqual(table_schema.get_column_by_name("a").is_rowid, False)
+
+        table_schema = database.table_schema("t_fk")
+        self.assertEqual(len(table_schema.unique_key_constraints), 1)
+        self.assertEqual(len(table_schema.check_constraints), 1)
+        self.assertEqual(table_schema.foreign_key_constraints, [(['ref_id'], 't_constraint_pk', ['a'])])
+
+        strict_schema = database.table_schema("t_strict")
+        if strict_schema is not None:
+            self.assertEqual(strict_schema.strict, True)
+
+        database.close()
+
+
 class TestPager(unittest.TestCase):
     def test_header(self):
         database = sqliteio.open("testdata/test.sqlite")

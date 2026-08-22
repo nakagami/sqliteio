@@ -976,6 +976,77 @@ def create_pk_fk_table():
     conn.close()
 
 
+def create_schema_edge_table():
+    f = "schema_edge.sqlite"
+    try:
+        os.remove(f)
+    except OSError:
+        pass
+    conn = sqlite3.connect(f)
+    cur = conn.cursor()
+    cur.execute("pragma page_size=512")
+
+    cur.execute("""
+        CREATE TABLE t_constraint_pk(
+            a INTEGER,
+            b TEXT,
+            CONSTRAINT pk_t_constraint_pk PRIMARY KEY(a)
+        )""")
+    cur.execute("INSERT INTO t_constraint_pk (b) VALUES ('A')")
+
+    cur.execute("""
+        CREATE TABLE t_no_type(
+            a PRIMARY KEY,
+            b TEXT
+        )""")
+    cur.execute("INSERT INTO t_no_type (a, b) VALUES ('K1', 'A')")
+
+    cur.execute("""
+        CREATE TABLE t_custom_type(
+            a UUID PRIMARY KEY,
+            b TEXT DEFAULT 'x,y'
+        )""")
+    cur.execute("INSERT INTO t_custom_type (a) VALUES ('u1')")
+
+    cur.execute("""
+        CREATE TABLE t_bracket(
+            [a b] INTEGER PRIMARY KEY,
+            [text col] TEXT
+        )""")
+    cur.execute("""INSERT INTO t_bracket ([text col]) VALUES ('B')""")
+
+    cur.execute("""
+        CREATE TABLE t_pk_desc(
+            a INTEGER PRIMARY KEY DESC,
+            b TEXT
+        )""")
+    cur.execute("INSERT INTO t_pk_desc (b) VALUES ('C')")
+
+    try:
+        cur.execute("""
+            CREATE TABLE t_strict(
+                a INT,
+                b TEXT
+            ) STRICT""")
+        cur.execute("INSERT INTO t_strict (a, b) VALUES (1, 'S')")
+    except sqlite3.OperationalError:
+        # STRICT is available on SQLite >= 3.37.0.
+        pass
+
+    cur.execute("""
+        CREATE TABLE t_fk(
+            id INTEGER PRIMARY KEY,
+            ref_id INTEGER,
+            CONSTRAINT uq_ref UNIQUE(ref_id),
+            CONSTRAINT chk_ref CHECK(ref_id > 0),
+            CONSTRAINT fk_ref FOREIGN KEY(ref_id) REFERENCES t_constraint_pk(a)
+        )""")
+    cur.execute("INSERT INTO t_fk (ref_id) VALUES (1)")
+
+    conn.commit()
+    conn.close()
+
+
 if __name__ == "__main__":
     create_test_table()
     create_test0_table()
@@ -1035,3 +1106,4 @@ if __name__ == "__main__":
     create_multi_pk_many_record_table()
 
     create_pk_fk_table()
+    create_schema_edge_table()

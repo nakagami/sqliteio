@@ -70,7 +70,7 @@ class Database:
         self.close()
 
     def _get_primary_key_index(self, table_name):
-        for i in self.index_schemas(table_name):
+        for i in self.index_schemas(table_name) or []:
             if i.is_primary_key:
                 return i
         return None
