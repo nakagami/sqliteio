@@ -12,9 +12,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Cache MicroPython build
+      id: cache-micropython
+      uses: actions/cache@v3
+      with:
+        path: /tmp/micropython-build
+        key: micropython-v1.24.0-${{ runner.os }}
+    - name: Build MicroPython from source
+      if: steps.cache-micropython.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get install -y build-essential libffi-dev pkg-config
+        git clone --depth 1 --branch v1.24.0 https://github.com/micropython/micropython.git /tmp/micropython-build
+        cd /tmp/micropython-build
+        make -C mpy-cross -j$(nproc)
+        make -C ports/unix submodules
+        make -C ports/unix -j$(nproc)
     - name: Install MicroPython
       run: |
-        sudo apt install micropython
+        sudo install -m755 /tmp/micropython-build/ports/unix/build-standard/micropython /usr/local/bin/micropython
+        micropython --version
+    - name: Install MicroPython packages
+      run: |
         micropython -c "import mip; mip.install('unittest')"
     - name: Test
       run: |
