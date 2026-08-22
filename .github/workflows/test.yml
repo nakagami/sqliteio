@@ -15,7 +15,7 @@ jobs:
     - name: Install MicroPython
       run: |
         sudo apt install micropython
-        micropython -m upip install micropython-unittest
+        micropython -c "import mip; mip.install('unittest')"
     - name: Test
       run: |
         (cd testdata; ./createdata.py)
